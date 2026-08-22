@@ -1,0 +1,291 @@
+<!doctype html><html><head><meta charset="utf-8">
+<title>Flood Project — Data Inventory</title>
+<style>
+ body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:1050px;margin:0 auto;padding:24px;color:#1e293b;line-height:1.5}
+ h1{color:#0f2b46;margin-bottom:2px} h2{color:#0e7490;border-bottom:2px solid #e2e8f0;padding-bottom:5px;margin-top:34px}
+ .lead{color:#475569}
+ .card{display:flex;gap:16px;border:1px solid #e2e8f0;border-radius:10px;padding:14px;margin:14px 0;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+ .thumb{flex:0 0 300px} .thumb img{width:300px;border-radius:6px;border:1px solid #e2e8f0}
+ .noimg{width:300px;height:180px;display:flex;align-items:center;justify-content:center;background:#f8fafc;color:#94a3b8;border-radius:6px}
+ .meta{flex:1} .meta h3{margin:0 0 6px;color:#0f2b46} .why{margin:0 0 10px}
+ table{font-size:13px;border-collapse:collapse} td{padding:2px 8px 2px 0;vertical-align:top}
+ td:first-child{color:#64748b;white-space:nowrap;font-weight:600}
+ code{background:#f1f5f9;padding:1px 5px;border-radius:4px;font-size:12px;word-break:break-all}
+ .box{background:#ecfdf5;border:1px solid #6ee7b7;border-radius:8px;padding:12px 16px;margin:16px 0}
+ details.script{border:1px solid #cbd5e1;border-radius:10px;padding:8px 20px;margin:18px 0;background:#f8fafc}
+ details.script summary{cursor:pointer;font-size:18px;font-weight:700;color:#0f2b46;padding:8px 0}
+ .script h4{color:#0e7490;margin:18px 0 6px}
+ .say{border-left:4px solid #0e7490;margin:8px 0;padding:7px 14px;color:#0f172a;background:#eef6f9;border-radius:0 6px 6px 0}
+ .cue{color:#92400e;font-weight:600;font-size:13px;margin:8px 0}
+ .qa{margin:12px 0} .qa .q{font-weight:700;color:#0f2b46;margin:0 0 2px}
+ .script code{background:#eef2ff}
+ h3{color:#0f2b46;margin-top:26px}
+ .wt{display:inline-block;background:#0e7490;color:#fff;font-size:11px;font-weight:700;padding:2px 9px;border-radius:12px;margin-left:8px;vertical-align:middle}
+ .wt.sup{background:#94a3b8}
+ .lab{margin:5px 0} .lab b{color:#0e7490}
+ .ahp{background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:12px 16px;margin:14px 0}
+</style></head><body>
+<h1>Flood Project — Data Inventory</h1>
+<p class="lead">Every dataset used in the project: what it is, why it matters, where it was downloaded from, and where the real file sits on this PC. Pictures are real previews rendered from your own files.</p>
+<div class="box"><b>Proof note:</b> the full-size original files remain in <code>C:\SWAT_Ogun</code> and the project's <code>models\factors</code> folder (~2&nbsp;GB total) — they were left in place to save disk space. Open any of them live in QGIS during your defense to prove the download.</div>
+
+
+<details class="script" open>
+<summary>&#128227; What to say when showing this folder — presenter's script</summary>
+<p class="lead">A short, natural script. <b>[brackets] = what to do.</b> Speak in your own words — this is just the spine.</p>
+
+<h4>1. Frame it first (10 seconds)</h4>
+<div class="say">"My project has <b>two models in one website</b>. One is a <b>flood map</b> that shows <i>where</i> in Lagos flooding is likely. The other is a <b>river model</b> of the Ogun — the river that carries floodwater into Lagos — that shows <i>how much</i> water flows. Both are built from <b>free, public data</b>, and I can show every dataset I used."</div>
+<p class="cue">[This page is already open — point to it.] "It lists every dataset — what it is, why I used it, where I downloaded it, and where the real file sits on this computer. The pictures are made from my own files."</p>
+
+<h4>2. Walk 3–4 highlights (don't read every row)</h4>
+<p class="cue">[Point to the DEM picture.]</p>
+<div class="say">"This is the land-height map. The high ground (brown) is in the north and drains down to the low ground (blue) near Lagos — that's <i>why</i> the river flows toward Lagos. The whole catchment and the 23 sub-basins are drawn from this."</div>
+<p class="cue">[Point to the Rivers picture.]</p>
+<div class="say">"These are the real river lines. Because Lagos is very flat, I 'burned' them into the height map to force the water onto the correct path. The red star is the outlet — where the basin drains, near the lagoon."</div>
+<p class="cue">[Point to the Weather chart.]</p>
+<div class="say">"This is the daily rain and temperature that drive the model — one set per sub-basin, 14 years. Rain becomes river water; temperature decides how much evaporates. You can see the wet season clearly."</div>
+<p class="cue">[Point to the GEOGLOWS river-flow chart.]</p>
+<div class="say">"And this is my 'answer key' — a trusted record of the Ogun's real flow. I tuned my model until it matched this, and that comparison is what gives my accuracy scores."</div>
+
+<h4>3. The ownership point (this is what impresses them)</h4>
+<div class="say">"Everything is <b>free and open-source</b> — no paid or black-box data. Every file was downloaded and processed by me, and every step is written down in my methodology log, so the whole model can be rebuilt from scratch by anyone."</div>
+<p class="cue">[Live proof: paste this in a browser — the real river data downloads instantly:]<br><code>https://geoglows.ecmwf.int/api/v2/retrospective/140585128?format=csv</code><br>[Or open any .tif file live in QGIS — the exact path is in the tables below.]</p>
+
+<h4>4. If they challenge you — short answers</h4>
+<div class="qa"><p class="q">"Why satellite data and not measured data?"</p>
+<div class="say">"Nigeria's ground-station network is sparse and gappy — I state this in my limitations. The accepted method for data-scarce basins is to use validated satellite and reanalysis data and bias-check it against local records, which I did (I compared CHIRPS rain against NIMET)."</div></div>
+<div class="qa"><p class="q">"Did you really download and build this yourself?"</p>
+<div class="say">"Yes — the original files are still on my machine, and every command, source link and setting is in my methodology log. I can open any of them right now."</div></div>
+<div class="qa"><p class="q">"You calibrated against GEOGLOWS — that's a model, not a real gauge."</p>
+<div class="say">"Correct, and I'm open about it. Real gauge data from NIHSA is slow and incomplete, so I used GEOGLOWS modelled discharge as the benchmark — a recognised data-scarce approach — and reported performance at the monthly step. It's documented as a limitation, not hidden."</div></div>
+
+<h4>5. Close</h4>
+<div class="say">"So before any modelling, I had a complete, consistent, fully-sourced data stack — and I can show you exactly where every piece came from."</div>
+</details>
+
+
+<h2>Part A — The SWAT+ river-model inputs (the part you built)</h2>
+<div class="card">
+  <div class="thumb"><img src="previews/swat_dem.png" alt="Land height (DEM) — Ogun basin"></div>
+  <div class="meta">
+    <h3>Land height (DEM) — Ogun basin</h3>
+    <p class="why">The height of every point. Tells the model which way water flows, and is what the catchment, the 23 sub-basins and slope are drawn from.</p>
+    <table>
+      <tr><td>Source</td><td><a href="https://copernicus-dem-30m.s3.amazonaws.com">Copernicus GLO-30 (30 m)</a></td></tr>
+      <tr><td>File on your PC</td><td><code>C:\SWAT_Ogun\DEM\ogun_dem_90m_clip.tif</code></td></tr>
+      <tr><td>Size</td><td>19 MB</td></tr>
+    </table>
+  </div>
+</div><div class="card">
+  <div class="thumb"><img src="previews/swat_rivers.png" alt="Rivers (burned in) + outlet"></div>
+  <div class="meta">
+    <h3>Rivers (burned in) + outlet</h3>
+    <p class="why">The real river lines. Because Lagos is flat, these were &#x27;burned&#x27; into the height map to force the water onto the true river path. Red star = the outlet where the basin drains.</p>
+    <table>
+      <tr><td>Source</td><td><a href="https://www.hydrosheds.org">HydroRIVERS / HydroSHEDS</a></td></tr>
+      <tr><td>File on your PC</td><td><code>C:\SWAT_Ogun\gis\ogun_rivers_burn.shp</code></td></tr>
+      <tr><td>Size</td><td>363 KB</td></tr>
+    </table>
+  </div>
+</div><div class="card">
+  <div class="thumb"><img src="previews/swat_landuse.png" alt="Land cover — Ogun basin"></div>
+  <div class="meta">
+    <h3>Land cover — Ogun basin</h3>
+    <p class="why">What sits on the land (forest/farm/grass/built-up). Forest soaks up rain; concrete sheds it. Sets how much water runs off each patch. Basin ≈ 43% tree, 16% crop, 5% built.</p>
+    <table>
+      <tr><td>Source</td><td><a href="https://esa-worldcover.org">ESA WorldCover 10 m</a></td></tr>
+      <tr><td>File on your PC</td><td><code>C:\SWAT_Ogun\landuse\ogun_landuse_90m.tif</code></td></tr>
+      <tr><td>Size</td><td>1021 KB</td></tr>
+    </table>
+  </div>
+</div><div class="card">
+  <div class="thumb"><img src="previews/swat_soil.png" alt="Soil texture — Ogun basin"></div>
+  <div class="meta">
+    <h3>Soil texture — Ogun basin</h3>
+    <p class="why">Soil type (from sand+clay). Decides how much rain soaks in vs runs off. Basin is 88% sandy loam — the reason your model turned out baseflow-dominated (slow underground flow).</p>
+    <table>
+      <tr><td>Source</td><td><a href="https://soilgrids.org">SoilGrids 250 m (ISRIC)</a></td></tr>
+      <tr><td>File on your PC</td><td><code>C:\SWAT_Ogun\soil\ogun_soil_90m.tif</code></td></tr>
+      <tr><td>Size</td><td>194 KB</td></tr>
+    </table>
+  </div>
+</div><div class="card">
+  <div class="thumb"><img src="previews/swat_sand.png" alt="Soil — sand %"></div>
+  <div class="meta">
+    <h3>Soil — sand %</h3>
+    <p class="why">Raw sand content used to work out the soil texture above. Higher sand = water soaks in faster.</p>
+    <table>
+      <tr><td>Source</td><td><a href="https://soilgrids.org">SoilGrids 250 m (ISRIC)</a></td></tr>
+      <tr><td>File on your PC</td><td><code>C:\SWAT_Ogun\soil\sand.tif</code></td></tr>
+      <tr><td>Size</td><td>10 MB</td></tr>
+    </table>
+  </div>
+</div><div class="card">
+  <div class="thumb"><img src="previews/swat_weather.png" alt="Daily rain (CHIRPS) + temperature (ERA5-Land)"></div>
+  <div class="meta">
+    <h3>Daily rain (CHIRPS) + temperature (ERA5-Land)</h3>
+    <p class="why">The daily rain that FUELS the model and the temperature that drives evaporation — one set per sub-basin, 2010–2023. Rain becomes river water; temperature decides how much is lost back to the air. (Sample: sub-basin 1, year 2020. Temp file: ogun_tmp_daily.csv.)</p>
+    <table>
+      <tr><td>Source</td><td><a href="https://code.earthengine.google.com">Google Earth Engine (CHIRPS + ERA5-Land)</a></td></tr>
+      <tr><td>File on your PC</td><td><code>C:\SWAT_Ogun\weather\ogun_pcp_daily.csv</code></td></tr>
+      <tr><td>Size</td><td>3 MB</td></tr>
+    </table>
+  </div>
+</div><div class="card">
+  <div class="thumb"><img src="previews/swat_discharge.png" alt="Real river flow (GEOGLOWS) — the &#x27;answer key&#x27;"></div>
+  <div class="meta">
+    <h3>Real river flow (GEOGLOWS) — the &#x27;answer key&#x27;</h3>
+    <p class="why">A trusted record of the Ogun&#x27;s actual flow. You tuned the model until its flow matched this — that comparison is what produced your NSE / R² / PBIAS scores.</p>
+    <table>
+      <tr><td>Source</td><td><a href="https://geoglows.ecmwf.int/api/v2/retrospective/140585128?format=csv">GEOGLOWS ECMWF v2, reach 140585128</a></td></tr>
+      <tr><td>File on your PC</td><td><code>C:\Users\bube\Documents\projects\flood-risk-portal\flood_model_bundle\swat\geoglows_ogun_kara_140585128_monthly.csv</code></td></tr>
+      <tr><td>Size</td><td>16 KB</td></tr>
+    </table>
+  </div>
+</div>
+
+<h2>Part B — The AHP flood-susceptibility map: its 8 factors (statewide Lagos)</h2>
+<div class="ahp"><b>How the map works (say this):</b> the map scores every 30 m cell in Lagos for flood-proneness. Each factor below is stretched to a 0–1 scale, multiplied by its <b>AHP weight</b> (the 8 weights add up to 1.00 and were set using an Analytic Hierarchy Process pairwise comparison), then all are added into one <b>Flood Hazard Index (0–1)</b>. That index is finally cut into 5 zones: Very Low → Very High. <b>Watch the direction:</b> for some factors a <i>low</i> value means high hazard (elevation, slope, distance to rivers); for others a <i>high</i> value does (TWI, flow accumulation, runoff, rainfall).</div>
+<h3>The 8 weighted factors</h3>
+<div class="card">
+  <div class="thumb"><img src="previews/factor_dem.png" alt="Elevation"></div>
+  <div class="meta">
+    <h3>Elevation <span class="wt">AHP weight 0.20</span></h3>
+    <p class="lab"><b>What it is:</b> Height of the land above sea level. Lagos is very low — mostly 0–47 m.</p>
+    <p class="lab"><b>Why we need it:</b> The biggest driver. Water collects in the lowest places, so <b>LOW ground = HIGH hazard</b>. Lagos is a low, coastal city, which is why elevation carries the largest weight.</p>
+    <p class="lab"><b>How we got it:</b> Read from a 30 m satellite elevation model (SRTM / Copernicus-class DEM). <a href="https://opentopography.org">[open source]</a></p>
+    <table>
+      <tr><td>File on your PC</td><td><code>C:\Users\bube\Documents\projects\flood-risk-portal\flood_model_bundle\models\factors\dem.tif</code></td></tr>
+      <tr><td>Size</td><td>15 MB</td></tr>
+    </table>
+  </div>
+</div><div class="card">
+  <div class="thumb"><img src="previews/factor_twi.png" alt="TWI — Topographic Wetness Index"></div>
+  <div class="meta">
+    <h3>TWI — Topographic Wetness Index <span class="wt">AHP weight 0.18</span></h3>
+    <p class="lab"><b>What it is:</b> An index of how much water tends to gather at each spot (combines how much land drains to it and how flat it is).</p>
+    <p class="lab"><b>Why we need it:</b> <b>HIGH TWI = water pools there = HIGH hazard.</b> It finds the wet, flat hollows where floodwater sits.</p>
+    <p class="lab"><b>How we got it:</b> Calculated from the DEM in GIS: ln(upslope area ÷ slope).</p>
+    <table>
+      <tr><td>File on your PC</td><td><code>C:\Users\bube\Documents\projects\flood-risk-portal\flood_model_bundle\models\factors\twi.tif</code></td></tr>
+      <tr><td>Size</td><td>66 MB</td></tr>
+    </table>
+  </div>
+</div><div class="card">
+  <div class="thumb"><img src="previews/factor_distance_to_rivers.png" alt="Distance to rivers"></div>
+  <div class="meta">
+    <h3>Distance to rivers <span class="wt">AHP weight 0.15</span></h3>
+    <p class="lab"><b>What it is:</b> How far each point is from the nearest river or drainage channel (metres).</p>
+    <p class="lab"><b>Why we need it:</b> Rivers overflow first, so <b>CLOSE to a river = HIGH hazard</b>.</p>
+    <p class="lab"><b>How we got it:</b> Rivers were traced from the DEM's flow network, then a distance layer was built in QGIS.</p>
+    <table>
+      <tr><td>File on your PC</td><td><code>C:\Users\bube\Documents\projects\flood-risk-portal\flood_model_bundle\models\factors\distance_to_rivers.tif</code></td></tr>
+      <tr><td>Size</td><td>66 MB</td></tr>
+    </table>
+  </div>
+</div><div class="card">
+  <div class="thumb"><img src="previews/factor_flow_accumulation.png" alt="Flow accumulation"></div>
+  <div class="meta">
+    <h3>Flow accumulation <span class="wt">AHP weight 0.12</span></h3>
+    <p class="lab"><b>What it is:</b> How much upstream land drains through each cell — i.e. where water concentrates into streams.</p>
+    <p class="lab"><b>Why we need it:</b> Cells with lots of upstream area carry more water, so <b>HIGH flow accumulation = HIGH hazard</b> (these are the natural drainage lines).</p>
+    <p class="lab"><b>How we got it:</b> Computed from the DEM using D8 flow routing in GIS.</p>
+    <table>
+      <tr><td>File on your PC</td><td><code>C:\Users\bube\Documents\projects\flood-risk-portal\flood_model_bundle\models\factors\flow_accumulation.tif</code></td></tr>
+      <tr><td>Size</td><td>68 MB</td></tr>
+    </table>
+  </div>
+</div><div class="card">
+  <div class="thumb"><img src="previews/factor_runoff_depth_mm.png" alt="Runoff depth"></div>
+  <div class="meta">
+    <h3>Runoff depth <span class="wt">AHP weight 0.12</span></h3>
+    <p class="lab"><b>What it is:</b> The depth of rain that runs off the surface instead of soaking in (mm).</p>
+    <p class="lab"><b>Why we need it:</b> More water left on the surface = <b>HIGH runoff = HIGH hazard</b>.</p>
+    <p class="lab"><b>How we got it:</b> Calculated with the standard SCS Curve-Number method from rainfall + the curve-number layer (below).</p>
+    <table>
+      <tr><td>File on your PC</td><td><code>C:\Users\bube\Documents\projects\flood-risk-portal\flood_model_bundle\models\factors\runoff_depth_mm.tif</code></td></tr>
+      <tr><td>Size</td><td>13 MB</td></tr>
+    </table>
+  </div>
+</div><div class="card">
+  <div class="thumb"><img src="previews/factor_slope.png" alt="Slope (steepness)"></div>
+  <div class="meta">
+    <h3>Slope (steepness) <span class="wt">AHP weight 0.10</span></h3>
+    <p class="lab"><b>What it is:</b> How steep the land is (degrees). Lagos is very flat — mostly under 5°.</p>
+    <p class="lab"><b>Why we need it:</b> Flat land drains slowly and water sits, so <b>FLAT = HIGH hazard</b>; steep land sheds water quickly.</p>
+    <p class="lab"><b>How we got it:</b> Calculated from the DEM in GIS.</p>
+    <table>
+      <tr><td>File on your PC</td><td><code>C:\Users\bube\Documents\projects\flood-risk-portal\flood_model_bundle\models\factors\slope.tif</code></td></tr>
+      <tr><td>Size</td><td>16 MB</td></tr>
+    </table>
+  </div>
+</div><div class="card">
+  <div class="thumb"><img src="previews/factor_rainfall_95pct.png" alt="Extreme rainfall (95th percentile)"></div>
+  <div class="meta">
+    <h3>Extreme rainfall (95th percentile) <span class="wt">AHP weight 0.08</span></h3>
+    <p class="lab"><b>What it is:</b> How heavy the heaviest rain days are across Lagos (mm).</p>
+    <p class="lab"><b>Why we need it:</b> More intense rain = more flooding, so <b>HIGH rainfall = HIGH hazard</b>.</p>
+    <p class="lab"><b>How we got it:</b> From CHIRPS satellite rainfall. <a href="https://www.chc.ucsb.edu/data/chirps">[open source]</a></p>
+    <table>
+      <tr><td>File on your PC</td><td><code>C:\Users\bube\Documents\projects\flood-risk-portal\flood_model_bundle\models\factors\rainfall_95pct.tif</code></td></tr>
+      <tr><td>Size</td><td>13 MB</td></tr>
+    </table>
+  </div>
+</div><div class="card">
+  <div class="thumb"><img src="previews/factor_lulc_10m.png" alt="Land use / land cover"></div>
+  <div class="meta">
+    <h3>Land use / land cover <span class="wt">AHP weight 0.05</span></h3>
+    <p class="lab"><b>What it is:</b> What covers each 10 m patch of land — built-up, vegetation, bare soil, water (5 classes).</p>
+    <p class="lab"><b>Why we need it:</b> Concrete and rooftops can't absorb rain and shed it fast, so <b>built-up = HIGH hazard</b>; vegetation soaks water up.</p>
+    <p class="lab"><b>How we got it:</b> Made with a Random Forest classifier trained on Sentinel-2 satellite imagery (≈53% accuracy — stated honestly as a limitation). <a href="https://dataspace.copernicus.eu">[open source]</a></p>
+    <table>
+      <tr><td>File on your PC</td><td><code>C:\Users\bube\Documents\projects\flood-risk-portal\flood_model_bundle\models\factors\lulc_10m.tif</code></td></tr>
+      <tr><td>Size</td><td>6 MB</td></tr>
+    </table>
+  </div>
+</div>
+<h3>Supporting inputs (feed the factors above; not weighted directly)</h3>
+<div class="card">
+  <div class="thumb"><img src="previews/factor_curve_number.png" alt="Curve number"></div>
+  <div class="meta">
+    <h3>Curve number <span class="wt sup">support layer</span></h3>
+    <p class="lab"><b>What it is:</b> A 0–100 number for how much rain runs off, based on soil type + land cover.</p>
+    <p class="lab"><b>Why we need it:</b> Not a hazard factor on its own — it is the <b>input to the runoff layer</b> above.</p>
+    <p class="lab"><b>How we got it:</b> Standard SCS lookup from soil hydrologic group + land cover.</p>
+    <table>
+      <tr><td>File on your PC</td><td><code>C:\Users\bube\Documents\projects\flood-risk-portal\flood_model_bundle\models\factors\curve_number.tif</code></td></tr>
+      <tr><td>Size</td><td>2 MB</td></tr>
+    </table>
+  </div>
+</div><div class="card">
+  <div class="thumb"><img src="previews/factor_rainfall_total_2021.png" alt="Annual rainfall (2021)"></div>
+  <div class="meta">
+    <h3>Annual rainfall (2021) <span class="wt sup">support layer</span></h3>
+    <p class="lab"><b>What it is:</b> Total rain that fell across Lagos in 2021 (mm).</p>
+    <p class="lab"><b>Why we need it:</b> The base rainfall used to compute runoff and to drive the rainfall 'what-if' scenarios.</p>
+    <p class="lab"><b>How we got it:</b> From CHIRPS satellite rainfall. <a href="https://www.chc.ucsb.edu/data/chirps">[open source]</a></p>
+    <table>
+      <tr><td>File on your PC</td><td><code>C:\Users\bube\Documents\projects\flood-risk-portal\flood_model_bundle\models\factors\rainfall_total_2021.tif</code></td></tr>
+      <tr><td>Size</td><td>13 MB</td></tr>
+    </table>
+  </div>
+</div><div class="card">
+  <div class="thumb"><img src="previews/factor_worldpop.png" alt="Population (WorldPop)"></div>
+  <div class="meta">
+    <h3>Population (WorldPop) <span class="wt sup">support layer</span></h3>
+    <p class="lab"><b>What it is:</b> Estimated number of people living in each cell.</p>
+    <p class="lab"><b>Why we need it:</b> <b>Not part of the flood score.</b> It is laid over the finished hazard zones to count <i>how many people</i> live in High / Very-High zones (your exposure numbers).</p>
+    <p class="lab"><b>How we got it:</b> From the WorldPop global population dataset. <a href="https://www.worldpop.org">[open source]</a></p>
+    <table>
+      <tr><td>File on your PC</td><td><code>C:\Users\bube\Documents\projects\flood-risk-portal\flood_model_bundle\models\factors\worldpop.tif</code></td></tr>
+      <tr><td>Size</td><td>5 MB</td></tr>
+    </table>
+  </div>
+</div>
+
+<h2>Part C — Small real data files (copied into this folder)</h2>
+<p>These are small enough to include directly — open them in Excel:</p>
+<ul><li><code>ogun_pcp_daily.csv</code> — 3 MB</li><li><code>ogun_tmp_daily.csv</code> — 6 MB</li><li><code>geoglows_ogun_kara_140585128_daily.csv</code> — 1002 KB</li><li><code>geoglows_ogun_kara_140585128_monthly.csv</code> — 16 KB</li><li><code>exposure_by_lga.csv</code> — 1 KB</li><li><code>exposure_by_zone.csv</code> — 227 B</li><li><code>nimet_climatology.csv</code> — 710 B</li><li><code>nimet_annual_series.csv</code> — 2 KB</li><li><code>ahp_weights.txt</code> — 530 B</li></ul>
+<p class="lead" style="margin-top:24px">Generated for Attah Gbubemi David · University of Lagos.</p>
+</body></html>

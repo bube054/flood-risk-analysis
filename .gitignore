@@ -1,41 +1,31 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# ── Python ───────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
 
-# dependencies
-/node_modules
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
+# ── Streamlit ────────────────────────────────────────────────────────────
+# .streamlit/config.toml IS tracked (app theme/settings); secrets are not.
+.streamlit/secrets.toml
 
-# testing
-/coverage
+# ── Large model rasters (~284 MB) ────────────────────────────────────────
+# Kept on disk, deliberately out of git: three files are ~70 MB each and this
+# repo has no remote, so versioning them costs disk without buying a backup.
+# Needed only for the rainfall-scenario tab — see flood_model_bundle/README.md §1.
+# Back these up separately (external drive / cloud), not via git.
+flood_model_bundle/models/factors/
 
-# next.js
-/.next/
-/out/
+# ── Node / Next.js (scaffold removed; kept for a possible future frontend) ─
+node_modules/
+.next/
+out/
+.env*.local
 
-# production
-/build
-
-# misc
+# ── OS / editor ──────────────────────────────────────────────────────────
+Thumbs.db
+ehthumbs.db
+Desktop.ini
 .DS_Store
-*.pem
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-
-# env files (can opt-in for committing if needed)
-.env*
-
-# vercel
-.vercel
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
+*.swp
