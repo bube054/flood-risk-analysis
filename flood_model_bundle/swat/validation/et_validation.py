@@ -29,9 +29,13 @@ retrieval. That makes it a weaker independence claim than MOD16 would be --
 state this plainly. `fetch_mod16_et_gee.js` in this folder reproduces the same
 analysis with true MODIS ET once you can log in to GEE.
 
-Run:  python et_validation.py
+Run:  python et_validation.py                                  # TerraClimate (bundled)
+      python et_validation.py --reference mod16_et_ogun_monthly.csv   # true MODIS ET
 """
 
+import argparse
+import calendar
+import csv
 import json
 import math
 from pathlib import Path
@@ -118,25 +122,71 @@ def load_swat_et():
     return out
 
 
+def load_mod16_csv(path):
+    """Read a MOD16 CSV produced by fetch_mod16_et_gee.js.
+
+    Expected columns: `month` (YYYY-MM) and `mod16_et_mm` (mm/month, already
+    scaled by the GEE script). Rows with a blank value are skipped -- GEE emits
+    empty cells where a month had no valid composites.
+    """
+    out = {}
+    with open(path, newline="") as f:
+        for row in csv.DictReader(f):
+            val = (row.get("mod16_et_mm") or "").strip()
+            if not val:
+                continue
+            y, m = row["month"].split("-")
+            out[(int(y), int(m))] = float(val)
+    if not out:
+        raise SystemExit(f"No usable rows in {path} (expected month, mod16_et_mm).")
+    return out
+
+
 def main():
-    ref = basin_mean_et()
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument(
+        "--reference",
+        metavar="CSV",
+        help="MOD16 CSV from fetch_mod16_et_gee.js. Omit to use the bundled "
+             "TerraClimate netCDFs.",
+    )
+    args = ap.parse_args()
+
+    if args.reference:
+        ref = load_mod16_csv(args.reference)
+        ref_name = f"MODIS MOD16A2GF (satellite ET) - {Path(args.reference).name}"
+        is_mod16 = True
+    else:
+        ref = basin_mean_et()
+        ref_name = "TerraClimate aet v1 (Abatzoglou et al. 2018), ~4km monthly"
+        is_mod16 = False
+
     sim = load_swat_et()
 
     keys = sorted(k for k in sim if k in ref)
     obs_v = [ref[k] for k in keys]
     sim_v = [sim[k] for k in keys]
 
-    # monthly climatology (12 values) - the seasonal-cycle test
-    clim_o, clim_s = [], []
+    # Monthly climatology (12 values) - the seasonal-cycle test.
+    # A calendar month can be empty if the reference has gaps (GEE emits blank
+    # cells for months with no valid composites), so skip those rather than
+    # dividing by zero. months_covered records what actually contributed.
+    clim_o, clim_s, months_covered = [], [], []
     for m in range(1, 13):
         oo = [ref[k] for k in keys if k[1] == m]
         ss = [sim[k] for k in keys if k[1] == m]
+        if not oo:
+            continue
+        months_covered.append(m)
         clim_o.append(sum(oo) / len(oo))
         clim_s.append(sum(ss) / len(ss))
+    if len(clim_o) < 12:
+        print(f"WARNING: reference covers only {len(clim_o)}/12 calendar months "
+              f"{months_covered} - climatology statistics are partial.")
 
     res = {
-        "reference_product": "TerraClimate aet v1 (Abatzoglou et al. 2018), ~4km monthly",
-        "reference_is_not_mod16": True,
+        "reference_product": ref_name,
+        "reference_is_not_mod16": not is_mod16,
         "independence_note": (
             "SWAT+ was calibrated on GEOGLOWS discharge only; no ET term entered "
             "the objective function. This is an independent multi-variable test."
@@ -151,6 +201,7 @@ def main():
             "mean_ref_mm": round(sum(obs_v) / len(obs_v), 1),
             "mean_sim_mm": round(sum(sim_v) / len(sim_v), 1),
         },
+        "months_covered": months_covered,
         "climatology": {
             "nse": round(nse(clim_o, clim_s), 3),
             "r2": round(r2(clim_o, clim_s), 3),
@@ -164,10 +215,15 @@ def main():
         },
     }
 
-    (HERE / "et_validation_results.json").write_text(json.dumps(res, indent=2))
+    # MOD16 runs write to their own files so a TerraClimate baseline is never
+    # silently overwritten -- keep both so the two references can be compared.
+    tag = "_mod16" if is_mod16 else ""
+    col = "mod16_et_mm" if is_mod16 else "terraclimate_aet_mm"
 
-    with open(HERE / "et_monthly_comparison.csv", "w", newline="\n") as f:
-        f.write("month,terraclimate_aet_mm,swat_et_mm\n")
+    (HERE / f"et_validation_results{tag}.json").write_text(json.dumps(res, indent=2))
+
+    with open(HERE / f"et_monthly_comparison{tag}.csv", "w", newline="\n") as f:
+        f.write(f"month,{col},swat_et_mm\n")
         for k in keys:
             f.write(f"{k[0]}-{k[1]:02d},{ref[k]:.2f},{sim[k]:.2f}\n")
 
@@ -181,6 +237,7 @@ def main():
           f"PBIAS {m['pbias']:+.1f}%  RMSE {m['rmse_mm']:.1f} mm")
     print(f"Climatology: NSE {c['nse']:+.2f}  R2 {c['r2']:.2f}  PBIAS {c['pbias']:+.1f}%")
     print("\nmonthly climatology (mm):")
+    print("  mon:", " ".join(f"{calendar.month_abbr[m]:>5}" for m in res["months_covered"]))
     print("  ref:", " ".join(f"{v:5.1f}" for v in c["ref_mm"]))
     print("  sim:", " ".join(f"{v:5.1f}" for v in c["sim_mm"]))
 
