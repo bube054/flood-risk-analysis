@@ -317,6 +317,60 @@ def swat_summary():
     return _swat()
 
 
+# ═══════════════════════ 7. Independent validation results ════════════════════
+# Two checks added AFTER the discharge calibration, neither of which the model was
+# tuned to:
+#   * ET        — simulated evapotranspiration vs an independent gridded product.
+#   * Spatial   — the AHP hazard map vs observed flood extent (2012 MODIS) and
+#                 NEMA 2022 flood reports.
+# Both report honest, mixed outcomes. See validation/README.md before quoting them.
+_VAL_CACHE = {}
+
+
+def _val():
+    if "d" not in _VAL_CACHE:
+        p = _core("validation_results.json")
+        _VAL_CACHE["d"] = json.load(open(p, encoding="utf-8")) if os.path.exists(p) else None
+    return _VAL_CACHE["d"]
+
+
+def validation_available():
+    """True if the independent validation results are bundled."""
+    return _val() is not None
+
+
+def et_validation():
+    """Independent ET check of the calibrated SWAT+ model. The model was fitted to
+    discharge only, so this is a genuine out-of-sample test on a second variable."""
+    v = _val()
+    return v["et_validation"] if v else None
+
+
+def spatial_validation():
+    """Hazard-map validation: pixel-level vs the 2012 MODIS flood extent (AUC-ROC,
+    zone enrichment) and LGA-level vs NEMA 2022 flood reports."""
+    v = _val()
+    return v["spatial_validation"] if v else None
+
+
+def calibration_tradeoff():
+    """Measured discharge-vs-ET trade-off across petco values. Shows why the
+    incumbent parameter set was retained."""
+    v = _val()
+    return v["multivariable_calibration_tradeoff"] if v else None
+
+
+def validation_status():
+    """Plain-language verdict on each validation, including what is NOT claimed."""
+    v = _val()
+    return v["honest_status"] if v else None
+
+
+def validation_summary():
+    """Full validation dict."""
+    return _val()
+
+
 if __name__ == "__main__":
     print("Design rainfall, 100-yr:", round(design_rainfall(100)), "mm")
     print("Return period of 3932 mm:", round(return_period(3932)), "yr")
@@ -332,3 +386,10 @@ if __name__ == "__main__":
         c = swat_calibration()
         print(f"SWAT+ Ogun streamflow: NSE {c['nse']}, R2 {c['r2']}, "
               f"PBIAS {c['pbias']}% (validation NSE {c['validation_2018_2023']['nse']})")
+    if validation_available():
+        e = et_validation()["monthly"]
+        s = spatial_validation()["test_a_pixel_level"]
+        print(f"Independent ET check: NSE {e['nse']}, PBIAS {e['pbias']}% "
+              f"(model never tuned to ET)")
+        print(f"Hazard map vs 2012 flood extent: AUC-ROC {s['auc_roc']}, "
+              f"High+VeryHigh enrichment {s['high_veryhigh_enrichment']}x")

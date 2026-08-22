@@ -1,0 +1,195 @@
+{
+  "test_a_pixel_level": {
+    "observation": "MODIS 250m flood extent, Nigeria Jul-Nov 2012 (NASA/DFO via HDX)",
+    "flood_cells": 39108,
+    "flood_area_km2": 35.2,
+    "lagos_cells": 4202132,
+    "auc_roc": 0.62,
+    "mean_hazard_index_flooded": 0.698,
+    "mean_hazard_index_lagos": 0.6337,
+    "zones": {
+      "Very Low": {
+        "pct_of_observed_flood": 0.0,
+        "pct_of_lagos": 0.02,
+        "enrichment": 0.0
+      },
+      "Low": {
+        "pct_of_observed_flood": 2.32,
+        "pct_of_lagos": 4.46,
+        "enrichment": 0.52
+      },
+      "Moderate": {
+        "pct_of_observed_flood": 30.61,
+        "pct_of_lagos": 46.61,
+        "enrichment": 0.66
+      },
+      "High": {
+        "pct_of_observed_flood": 33.19,
+        "pct_of_lagos": 27.92,
+        "enrichment": 1.19
+      },
+      "Very High": {
+        "pct_of_observed_flood": 33.89,
+        "pct_of_lagos": 20.99,
+        "enrichment": 1.61
+      }
+    },
+    "high_veryhigh_pct_of_flood": 67.08,
+    "high_veryhigh_pct_of_lagos": 48.91,
+    "high_veryhigh_enrichment": 1.37
+  },
+  "test_b_lga_level": {
+    "observation": "NEMA 2022 flood records, Lagos (62 community reports via HDX)",
+    "lgas_with_reports": 13,
+    "lgas_without_reports": 7,
+    "unmatched_lga_names": [],
+    "spearman_rho": -0.45,
+    "spearman_rho_vs_absolute_exposed": 0.174,
+    "spearman_rho_vs_population": 0.569,
+    "mean_model_pct_reported_lgas": 31.7,
+    "mean_model_pct_unreported_lgas": 47.9,
+    "mannwhitney_p": 0.1043,
+    "per_lga": [
+      {
+        "lga": "Alimosho",
+        "nema_reports": 11,
+        "model_pct_high_vh": 14.4,
+        "population": 1663634,
+        "model_people_high_vh": 239563
+      },
+      {
+        "lga": "Ikorodu",
+        "nema_reports": 10,
+        "model_pct_high_vh": 22.4,
+        "population": 1323434,
+        "model_people_high_vh": 296449
+      },
+      {
+        "lga": "Ojo",
+        "nema_reports": 10,
+        "model_pct_high_vh": 53.4,
+        "population": 693543,
+        "model_people_high_vh": 370352
+      },
+      {
+        "lga": "Epe",
+        "nema_reports": 7,
+        "model_pct_high_vh": 23.5,
+        "population": 230615,
+        "model_people_high_vh": 54195
+      },
+      {
+        "lga": "Kosofe",
+        "nema_reports": 6,
+        "model_pct_high_vh": 47.1,
+        "population": 447805,
+        "model_people_high_vh": 210916
+      },
+      {
+        "lga": "Agege",
+        "nema_reports": 5,
+        "model_pct_high_vh": 9.9,
+        "population": 331694,
+        "model_people_high_vh": 32838
+      },
+      {
+        "lga": "Badagary",
+        "nema_reports": 4,
+        "model_pct_high_vh": 32.3,
+        "population": 790170,
+        "model_people_high_vh": 255225
+      },
+      {
+        "lga": "Ifako/Ijaye",
+        "nema_reports": 3,
+        "model_pct_high_vh": 7.2,
+        "population": 526243,
+        "model_people_high_vh": 37889
+      },
+      {
+        "lga": "Oshodi/Isolo",
+        "nema_reports": 2,
+        "model_pct_high_vh": 24.2,
+        "population": 413485,
+        "model_people_high_vh": 100063
+      },
+      {
+        "lga": "Amuwo Odofin",
+        "nema_reports": 1,
+        "model_pct_high_vh": 47.6,
+        "population": 580018,
+        "model_people_high_vh": 276089
+      },
+      {
+        "lga": "Apapa",
+        "nema_reports": 1,
+        "model_pct_high_vh": 51.3,
+        "population": 236470,
+        "model_people_high_vh": 121309
+      },
+      {
+        "lga": "Eti-Osa",
+        "nema_reports": 1,
+        "model_pct_high_vh": 67.8,
+        "population": 432884,
+        "model_people_high_vh": 293495
+      },
+      {
+        "lga": "Ikeja",
+        "nema_reports": 1,
+        "model_pct_high_vh": 10.9,
+        "population": 488578,
+        "model_people_high_vh": 53255
+      },
+      {
+        "lga": "Ajeromi/Ifelodun",
+        "nema_reports": 0,
+        "model_pct_high_vh": 43.4,
+        "population": 286601,
+        "model_people_high_vh": 124385
+      },
+      {
+        "lga": "Ibeju/Lekki",
+        "nema_reports": 0,
+        "model_pct_high_vh": 47.4,
+        "population": 319275,
+        "model_people_high_vh": 151336
+      },
+      {
+        "lga": "LagosIsland",
+        "nema_reports": 0,
+        "model_pct_high_vh": 65.0,
+        "population": 211225,
+        "model_people_high_vh": 137296
+      },
+      {
+        "lga": "Mainland",
+        "nema_reports": 0,
+        "model_pct_high_vh": 48.7,
+        "population": 234562,
+        "model_people_high_vh": 114232
+      },
+      {
+        "lga": "Mushin",
+        "nema_reports": 0,
+        "model_pct_high_vh": 28.9,
+        "population": 254658,
+        "model_people_high_vh": 73596
+      },
+      {
+        "lga": "Shomolu",
+        "nema_reports": 0,
+        "model_pct_high_vh": 58.2,
+        "population": 262688,
+        "model_people_high_vh": 152884
+      },
+      {
+        "lga": "Surulere",
+        "nema_reports": 0,
+        "model_pct_high_vh": 43.9,
+        "population": 611291,
+        "model_people_high_vh": 268357
+      }
+    ]
+  }
+}

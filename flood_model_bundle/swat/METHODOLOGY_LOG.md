@@ -321,25 +321,105 @@ near-baseline in rainfall-only SWAT (the 2022 flood was Oyan Dam-release driven 
   rainfall-scenario table/chart, extreme-year + Oyan-Dam limitation note.
 - Both files `py_compile`-clean.
 
-**PROJECT COMPLETE** — thesis Objectives (ii) [SWAT+ NSE≥0.5] and (v) [validation] satisfied;
-statewide AHP susceptibility + calibrated Ogun SWAT+ streamflow now both live in the portal.
+**SWAT+ COMPONENT COMPLETE** — thesis Objectives (ii) [SWAT+ NSE≥0.5] and (v) [validation]
+satisfied; statewide AHP susceptibility + calibrated Ogun SWAT+ streamflow now both live in
+the portal.
+
+> Scope of that claim: it is measured against the **thesis objectives**, not against the
+> four-point calibration/validation plan proposed to the supervisor. Independent ET and
+> spatial validation were still outstanding at this point — see §11, which closes them and
+> reports honestly mixed results.
 
 ---
 
-## 6. Still to do (planned)
+## 11. Step 8 — Independent validation (ET + spatial)
 
-| Step | Input needed | Source | Purpose |
+Added after calibration to close the gap identified in review: **calibration and
+validation both used GEOGLOWS**, split only by time period, so nothing outside GEOGLOWS
+had ever checked the model. Two independent tests were added. Scripts and full caveats
+live in `swat/validation/` and `validation/`.
+
+### 11.1 ET — a second variable the model was never tuned to
+
+Reference: **TerraClimate `aet`** (Abatzoglou et al. 2018), ~4 km monthly, basin-masked
+to the delineated watershed, 155 months (2011–2023). Retrieved via the THREDDS NCSS
+endpoint as per-year netCDF subsets (~56 KB each — disk-light). **NCSS returns raw Int16;
+`scale_factor = 0.1` must be applied manually.**
+
+> **This is NOT MODIS MOD16.** MOD16 needs an interactive GEE/Earthdata login, and the
+> no-login route (ORNL DAAC MODIS REST API) returned HTTP 500 on every endpoint. Say so
+> plainly — TerraClimate is a climatic water-balance product, not a satellite retrieval,
+> which is a weaker independence claim. `validation/fetch_mod16_et_gee.js` redoes this
+> with true satellite ET once you can log in.
+
+| | NSE | R² | PBIAS |
 |---|---|---|---|
-| HRUs | Land use | ESA WorldCover 10 m (AWS) | HRU land-use layer |
-| HRUs | Soil | SoilGrids / FAO-HWSD | HRU soil layer + usersoil params |
-| Run | Daily weather | CHIRPS daily precip + temp | SWAT forcing (daily) |
-| Calibrate | (targets ready) | GEOGLOWS §2 (+ MOD16 ET optional) | NSE≥0.5, R²≥0.6, PBIAS±25% |
-| Scenarios | — | rainfall ±%, 2022 event | baseline / extreme / climate sensitivity |
-| Integrate | SWAT runoff raster | model output | replace SCS-CN factor in `model_api.py`; portal panel |
+| Monthly (155 mo) | 0.18 | 0.39 | +12.5% |
+| Monthly climatology | 0.29 | 0.76 | +12.3% |
+
+Annual: reference **900** vs SWAT **787 mm/yr**. Volume sits inside the ±25% Moriasi band;
+seasonal **dynamics** are weak — SWAT damps the swing (too much dry-season ET, too little
+at the peak). Honest verdict: **partial pass**.
+
+### 11.2 Multi-variable calibration probe (why parameters were NOT re-tuned)
+
+`swat/validation/calib_joint.py` scores each run against discharge **and** ET together.
+
+| petco | Discharge NSE / R² / PBIAS | ET NSE / PBIAS | Meets thesis thresholds |
+|---|---|---|---|
+| **1.20 (incumbent)** | 0.507 / 0.606 / +1.6% | 0.180 / +12.5% | ✅ |
+| 1.35 | 0.530 / 0.596 / +15.7% | 0.303 / +6.6% | ❌ R² 0.596 |
+| 1.50 | 0.507 / 0.583 / +28.7% | 0.367 / +1.1% | ❌ R² and PBIAS |
+
+ET improves monotonically as discharge degrades — the objectives genuinely conflict. Only
+the incumbent meets NSE≥0.50, R²≥0.60, |PBIAS|≤25%, so **the incumbent is retained**.
+
+> **Diagnosis worth defending:** `petco` is pinned at its allowed maximum (1.20 in
+> `cal_parms.cal`). Independently, TerraClimate says SWAT ET is ~12.5% too low. Two
+> unrelated lines of evidence agree the model wants more ET than the parameter range
+> permits. Reaching 1.35/1.50 required temporarily raising that ceiling — **restored
+> afterwards** (`cal_parms.cal.bak_joint`).
+>
+> Note the incumbent margins are **thin**: NSE 0.507 vs 0.50, R² 0.606 vs 0.60. Any change
+> to forcing or parameters can drop the model below the thesis thresholds — re-run
+> `calib_joint.py` after any edit.
+
+### 11.3 Spatial validation of the AHP hazard map
+
+The statewide AHP map had never been checked against a real flood. Two observations, both
+real and sourced — **no points were geocoded or invented**.
+
+**Test A — pixel level** vs MODIS 250 m flood extent, Nigeria Jul–Nov 2012 (NASA/DFO via
+HDX). 35.2 km² of observed flood inside Lagos (290 separate patches; permanent water is
+masked out, so this is detected flooding, not the lagoon).
+
+- **AUC-ROC 0.62** (0.5 = no skill) — modest but real discrimination.
+- Zone enrichment (share of observed flood ÷ share of Lagos area) rises **monotonically**:
+  Low 0.52 · Moderate 0.66 · High 1.19 · **Very High 1.61**.
+- High+Very High holds 67.1% of observed flood vs 48.9% of Lagos → **1.37× enrichment**.
+
+The map **ranks** hazard in the right order; it does not discriminate sharply.
+
+**Test B — LGA level** vs NEMA 2022 Lagos flood records (62 community reports, 13 LGAs).
+
+- Spearman ρ vs modelled % High+V.High: **−0.45**
+- ρ vs absolute exposed population: **+0.17**
+- ρ vs **raw population: +0.57**
+
+**Inconclusive — reported as a null result.** Report counts track population far better
+than they track hazard, so the dataset measures reporting effort, not flood susceptibility.
+Do not present Test B as either support for or refutation of the map.
+
+> Data-quality note: `exposure_by_lga.csv` misspells Badagry as **"Badagary"**; the matcher
+> aliases it so the 4 Badagry reports are not silently dropped.
+
+**Limitations to carry into the thesis:** MODIS 250 m is coarse for urban Lagos (street-scale
+flooding is invisible — non-detection ≠ no flooding); 2012 is a single event against a static
+susceptibility surface; NEMA reporting is effort-biased.
 
 ---
 
-## 7. Key reproducibility notes / decisions
+## 12. Key reproducibility notes / decisions
 
 - **Everything is EPSG:32631**; keep it consistent or QSWAT+/factor overlays misalign.
 - **Discharge is modelled (GEOGLOWS), not gauged** — state this plainly; it's a recognised

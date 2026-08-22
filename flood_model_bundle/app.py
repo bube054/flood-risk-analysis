@@ -8,6 +8,7 @@ Lagos State, Nigeria.
 Run:  streamlit run app.py
 """
 import base64
+import calendar
 import io
 import math
 import os
@@ -498,7 +499,8 @@ with st.sidebar:
 # TABS
 # ═══════════════════════════════════════════════════════════════════════════════
 
-tab_overview, tab_map, tab_query, tab_exposure, tab_scenario, tab_climate, tab_hydro = st.tabs([
+(tab_overview, tab_map, tab_query, tab_exposure, tab_scenario, tab_climate,
+ tab_hydro, tab_valid) = st.tabs([
     "📖 Overview",
     "🗺️ Hazard Map",
     "📍 Point Query",
@@ -506,6 +508,7 @@ tab_overview, tab_map, tab_query, tab_exposure, tab_scenario, tab_climate, tab_h
     "🌧️ Scenario",
     "📊 Climate",
     "🌊 Hydrology (SWAT+)",
+    "✅ Validation",
 ])
 
 # ─────────────────────── TAB 1 — PROJECT OVERVIEW ────────────────────────────
@@ -1161,4 +1164,122 @@ with tab_hydro:
             "Calibrated against GEOGLOWS modelled discharge (a recognised data-scarce approach). "
             "Oyan Dam regulation is not modelled — a documented limitation. "
             "Full build & calibration trail: `swat/METHODOLOGY_LOG.md`."
+        )
+
+
+# ─────────────────────── TAB 8 — INDEPENDENT VALIDATION ──────────────────────
+with tab_valid:
+    st.markdown("## ✅ Independent Validation")
+    st.markdown(
+        "Checks the model was **not** tuned to. The SWAT+ parameters were fitted to "
+        "discharge alone and the AHP map was built from expert weights, so everything "
+        "below is an out-of-sample test. Results are mixed — they are reported as found."
+    )
+
+    if not M.validation_available():
+        st.info("Validation results not bundled. Run `validation/build_validation_bundle.py`.")
+    else:
+        _v = M.validation_summary()
+        _et = M.et_validation()
+        _sp = M.spatial_validation()
+        _a = _sp["test_a_pixel_level"]
+        _b = _sp["test_b_lga_level"]
+
+        # ── 1. ET check ──────────────────────────────────────────────────────
+        st.markdown("### 1 · Evapotranspiration — a second variable, never calibrated to")
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Monthly NSE", f"{_et['monthly']['nse']:.2f}")
+        c2.metric("Monthly R²", f"{_et['monthly']['r2']:.2f}")
+        c3.metric("PBIAS", f"{_et['monthly']['pbias']:+.1f}%",
+                  help="Within the ±25% Moriasi band")
+        c4.metric("Annual ET", f"{_et['annual_mm']['swat']:.0f} mm",
+                  delta=f"{_et['annual_mm']['swat'] - _et['annual_mm']['reference']:+.0f} vs ref")
+
+        _c = _et["climatology"]
+        st.line_chart(
+            pd.DataFrame(
+                {"Reference ET": _c["ref_mm"], "SWAT+ simulated ET": _c["sim_mm"]},
+                # zero-padded so Streamlit's alphabetical index sort stays chronological
+                index=[f"{m:02d} {calendar.month_abbr[m]}" for m in range(1, 13)],
+            ),
+            height=260,
+        )
+        st.markdown(
+            f"**Verdict — {_v['honest_status']['et_independent_check']}** "
+            "The model reproduces annual ET volume but damps the seasonal swing: "
+            "too much ET in the dry season, too little at the peak."
+        )
+        st.caption(
+            f"Reference: {_et['reference_product']}. "
+            "This is **not** MODIS MOD16 — MOD16 needs an interactive Earth Engine "
+            "login. Run `swat/validation/fetch_mod16_et_gee.js` to redo this with "
+            "true satellite ET."
+        )
+
+        # ── 2. Calibration trade-off ─────────────────────────────────────────
+        st.markdown("### 2 · Why the parameters were not re-tuned to ET")
+        _t = M.calibration_tradeoff()
+        st.dataframe(
+            pd.DataFrame([{
+                "petco": r["petco"],
+                "Discharge NSE": r["discharge"]["nse"],
+                "Discharge R²": r["discharge"]["r2"],
+                "Discharge PBIAS %": r["discharge"]["pbias"],
+                "ET NSE": r["et"]["nse"],
+                "ET PBIAS %": r["et"]["pbias"],
+                "Meets thresholds": "✅" if r["discharge_passes"] else "❌",
+            } for r in _t["runs"]]),
+            use_container_width=True, hide_index=True,
+        )
+        st.info("🔍 " + _t["diagnosis"])
+
+        # ── 3. Hazard map vs observed floods ─────────────────────────────────
+        st.markdown("### 3 · Hazard map vs observed floods")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("AUC-ROC", f"{_a['auc_roc']:.2f}",
+                  help="0.5 = no skill, 1.0 = perfect")
+        c2.metric("High+V.High enrichment", f"{_a['high_veryhigh_enrichment']:.2f}×",
+                  help="Share of observed flood vs share of Lagos area")
+        c3.metric("Observed flood area", f"{_a['flood_area_km2']:.0f} km²")
+
+        st.dataframe(
+            pd.DataFrame([{
+                "Hazard zone": z,
+                "% of observed flood": _a["zones"][z]["pct_of_observed_flood"],
+                "% of Lagos": _a["zones"][z]["pct_of_lagos"],
+                "Enrichment": _a["zones"][z]["enrichment"],
+            } for z in ("Very Low", "Low", "Moderate", "High", "Very High")]),
+            use_container_width=True, hide_index=True,
+        )
+        st.markdown(
+            "Enrichment climbs monotonically across the zones — the map **ranks** "
+            "flood risk in the right order. Discrimination is modest, not strong."
+        )
+
+        # ── 4. The negative result ───────────────────────────────────────────
+        st.markdown("### 4 · LGA-level check — an inconclusive result")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("ρ vs modelled exposure", f"{_b['spearman_rho']:+.2f}")
+        c2.metric("ρ vs absolute exposed", f"{_b['spearman_rho_vs_absolute_exposed']:+.2f}")
+        c3.metric("ρ vs raw population", f"{_b['spearman_rho_vs_population']:+.2f}")
+        st.warning(
+            "⚠️ NEMA flood-report counts track **raw population** far better than "
+            "modelled exposure. Reporting effort — not flood hazard — dominates this "
+            "dataset, so it cannot validate the map. Reported as a null result."
+        )
+        st.dataframe(
+            pd.DataFrame(_b["per_lga"]).rename(columns={
+                "lga": "LGA", "nema_reports": "NEMA reports",
+                "model_pct_high_vh": "Model % High+V.High",
+                "population": "Population",
+                "model_people_high_vh": "People exposed",
+            }),
+            use_container_width=True, hide_index=True, height=320,
+        )
+
+        st.error("🚫 **Not claimed:** " + _v["honest_status"]["not_claimed"])
+        st.caption(
+            "Sources: MODIS 250 m flood extent Jul–Nov 2012 (NASA/DFO via HDX); "
+            "NEMA 2022 Lagos flood records (62 reports, via HDX). "
+            "Method and caveats: `validation/spatial_validation.py`."
         )

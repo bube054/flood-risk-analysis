@@ -1,0 +1,52 @@
+{
+  "reference_product": "TerraClimate aet v1 (Abatzoglou et al. 2018), ~4km monthly",
+  "reference_is_not_mod16": true,
+  "independence_note": "SWAT+ was calibrated on GEOGLOWS discharge only; no ET term entered the objective function. This is an independent multi-variable test.",
+  "n_months": 155,
+  "period": "2011-01 to 2023-11",
+  "monthly": {
+    "nse": 0.18,
+    "r2": 0.394,
+    "pbias": 12.51,
+    "rmse_mm": 24.18,
+    "mean_ref_mm": 75.0,
+    "mean_sim_mm": 65.6
+  },
+  "climatology": {
+    "nse": 0.289,
+    "r2": 0.756,
+    "pbias": 12.33,
+    "ref_mm": [
+      37.3,
+      34.3,
+      64.2,
+      87.7,
+      104.2,
+      99.5,
+      87.7,
+      79.7,
+      83.1,
+      101.0,
+      71.8,
+      47.3
+    ],
+    "sim_mm": [
+      55.9,
+      49.8,
+      59.5,
+      64.9,
+      75.6,
+      68.8,
+      67.9,
+      65.4,
+      70.7,
+      73.8,
+      72.0,
+      63.0
+    ]
+  },
+  "annual_mm": {
+    "reference": 900.0,
+    "swat": 787.0
+  }
+}
