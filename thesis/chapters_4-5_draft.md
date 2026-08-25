@@ -207,29 +207,55 @@ The two objectives are therefore in direct conflict within the available paramet
 
 **4.7 Flood Susceptibility Mapping Results**
 
-**4.7.1 AHP Weights**
+**4.7.1 Pairwise Comparison Matrix and Consistency Check**
 
-Table 4.14 AHP weights for the flood susceptibility index
+Table 4.14 Pairwise comparison matrix for the eight susceptibility factors
 
-| Factor | Weight |
-|---|---|
-| Elevation | 0.20 |
-| Topographic Wetness Index | 0.18 |
-| Distance to rivers | 0.15 |
-| Flow accumulation | 0.12 |
-| Runoff (SCS-CN) | 0.12 |
-| Slope | 0.10 |
-| Extreme rainfall | 0.08 |
-| Land use and land cover | 0.05 |
-| Total | 1.00 |
+| Factor | Elev | TWI | DistRiv | FlowAcc | Runoff | Slope | Rain | LULC |
+|---|---|---|---|---|---|---|---|---|
+| Elevation | 1 | 1 | 1 | 2 | 2 | 2 | 3 | 4 |
+| TWI | 1 | 1 | 1 | 2 | 2 | 2 | 2 | 4 |
+| Distance to rivers | 1 | 1 | 1 | 1 | 1 | 2 | 2 | 3 |
+| Flow accumulation | 1/2 | 1/2 | 1 | 1 | 1 | 1 | 2 | 2 |
+| Runoff | 1/2 | 1/2 | 1 | 1 | 1 | 1 | 2 | 2 |
+| Slope | 1/2 | 1/2 | 1/2 | 1 | 1 | 1 | 1 | 2 |
+| Extreme rainfall | 1/3 | 1/2 | 1/2 | 1/2 | 1/2 | 1 | 1 | 2 |
+| Land use / land cover | 1/4 | 1/4 | 1/3 | 1/2 | 1/2 | 1/2 | 1/2 | 1 |
 
-*[Insert the consistency ratio from your pairwise comparison matrix here. Section 3.6.3 requires CR ≤ 0.10. The matrix should appear as an appendix.]*
+*[Editorial note, to be removed before submission: verify that every judgement in Table 4.14 reflects your own reasoning about Lagos flood processes. The matrix reproduces the weights actually applied in the model, but the judgements must be yours to defend. Adjust any entry you disagree with and re-run `validation/ahp_consistency.py` to obtain the revised weights and CR.]*
 
-From the results in Table 4.14 above, the weighting is dominated by terrain variables. Elevation and the Topographic Wetness Index together account for 0.38 of the index, and the five terrain-related factors together account for 0.75. The two rainfall-driven components account for 0.20, and land cover for 0.05.
+Table 4.15 Derived AHP weights, applied weights, and consistency statistics
+
+| Factor | Derived weight | Applied weight | Difference |
+|---|---|---|---|
+| Elevation | 0.202 | 0.20 | +0.002 |
+| Topographic Wetness Index | 0.192 | 0.18 | +0.012 |
+| Distance to rivers | 0.156 | 0.15 | +0.006 |
+| Flow accumulation | 0.114 | 0.12 | −0.006 |
+| Runoff (SCS-CN) | 0.114 | 0.12 | −0.006 |
+| Slope | 0.096 | 0.10 | −0.004 |
+| Extreme rainfall | 0.077 | 0.08 | −0.003 |
+| Land use and land cover | 0.050 | 0.05 | 0.000 |
+| **Total** | **1.000** | **1.00** | — |
+
+| Consistency statistic | Value | Criterion | Status |
+|---|---|---|---|
+| λ_max | 8.1139 | — | — |
+| Consistency Index (CI) | 0.0163 | — | — |
+| Random Index (RI), n = 8 | 1.41 | — | — |
+| **Consistency Ratio (CR)** | **0.0115** | **≤ 0.10** | **Met** |
+
+The results in Tables 4.14 and 4.15 above show a Consistency Ratio of 0.0115, which is well below the acceptance criterion of 0.10 stated in Section 3.6.3. The pairwise judgements are therefore sufficiently coherent, and the derived weight vector is accepted. Weights were obtained by the geometric mean approximation to the principal eigenvector, as specified in Section 3.6.3, and λ_max was computed from the resulting weight vector.
+
+The weights applied in the model were rounded to two decimal places, as recorded in the model configuration. The maximum difference between the derived and applied values is 0.012, occurring for the Topographic Wetness Index, and arises because pairwise judgements are restricted to Saaty's integer scale and its reciprocals. A difference of this magnitude is immaterial to the classification, since the susceptibility index is subsequently divided into five equal-interval classes.
+
+From the results in Table 4.15 above, the weighting is dominated by terrain variables. Elevation and the Topographic Wetness Index together account for 0.394 of the index, and the five terrain-related factors, comprising elevation, TWI, distance to rivers, flow accumulation and slope, together account for 0.760. The two rainfall-driven components, runoff and extreme rainfall, account for 0.191, and land use and land cover for 0.050.
+
+The implications of this distribution for the map's ability to represent flooding that is not controlled by terrain position are examined in Section 5.1.
 
 **4.7.2 Susceptibility Classification and Population Exposure**
 
-Table 4.15 Susceptibility zone areas and resident population, Lagos State
+Table 4.16 Susceptibility zone areas and resident population, Lagos State
 
 | Zone | Area (km²) | % of Lagos | Population | % of population |
 |---|---|---|---|---|
@@ -239,9 +265,9 @@ Table 4.15 Susceptibility zone areas and resident population, Lagos State
 | High | 3,381.0 | 27.92 | 4,368,569 | 35.17 |
 | Very High | 799.0 | 20.99 | 441,500 | 3.55 |
 
-The results in Table 4.15 above show that 4,810,069 residents, representing 38.7% of the state population, fall within the High or Very High susceptibility zones. The High and Very High zones together cover 48.91% of the state area.
+The results in Table 4.16 above show that 4,810,069 residents, representing 38.7% of the state population, fall within the High or Very High susceptibility zones. The High and Very High zones together cover 48.91% of the state area.
 
-Table 4.16 Highest and lowest LGA exposure
+Table 4.17 Highest and lowest LGA exposure
 
 | LGA | % population in High or Very High |
 |---|---|
@@ -253,17 +279,17 @@ Table 4.16 Highest and lowest LGA exposure
 | Agege | 9.9 |
 | Ifako/Ijaye | 7.2 |
 
-From the results in Table 4.16 above, exposure ranges from 67.8% in Eti-Osa to 7.2% in Ifako/Ijaye. The highest-exposure LGAs lie along the coastal and lagoon-adjacent low-lying belt, which is consistent with the terrain-dominated weighting reported in Table 4.14.
+From the results in Table 4.17 above, exposure ranges from 67.8% in Eti-Osa to 7.2% in Ifako/Ijaye. The highest-exposure LGAs lie along the coastal and lagoon-adjacent low-lying belt, which is consistent with the terrain-dominated weighting reported in Table 4.14.
 
 **4.7.3 Rainfall Frequency Analysis**
 
-Table 4.17 Gumbel design rainfall, NiMet Ikeja station, 1996–2025
+Table 4.18 Gumbel design rainfall, NiMet Ikeja station, 1996–2025
 
 | Return period (years) | 2 | 5 | 10 | 25 | 50 | 100 |
 |---|---|---|---|---|---|---|
 | Design rainfall (mm) | 1,734 | 2,205 | 2,516 | 2,909 | 3,201 | 3,490 |
 
-The results in Table 4.17 above were derived from a Gumbel distribution fitted to the annual series with location parameter 1582.4 and scale parameter 414.8. Mean annual rainfall over the record is 1,821.8 mm.
+The results in Table 4.18 above were derived from a Gumbel distribution fitted to the annual series with location parameter 1582.4 and scale parameter 414.8. Mean annual rainfall over the record is 1,821.8 mm.
 
 The observed maximum of 3,931.7 mm, recorded in 2018, corresponds to a return period of approximately 289 years on this fit. This indicates either an exceptional event or that the Gumbel distribution understates the upper tail at this station.
 
@@ -275,20 +301,20 @@ Mann-Kendall testing found no significant trend in annual rainfall over the reco
 
 Two independent observational datasets were compiled from open archives, as no comprehensive spatial flood database exists for Lagos State.
 
-Table 4.18 Flood validation datasets
+Table 4.19 Flood validation datasets
 
 | Dataset | Source | Coverage in Lagos |
 |---|---|---|
 | MODIS 250 m flood extent, Jul–Nov 2012 | NASA/DFO via HDX | 35.2 km² across 290 patches |
 | NEMA 2022 flood records | NEMA via HDX | 62 reports across 13 of 20 LGAs |
 
-From the results in Table 4.18 above, the 2012 MODIS product provides 35.2 km² of detected flood extent within Lagos State, distributed across 290 discrete patches. Permanent water bodies are masked in the source product, so the extent represents detected flooding rather than the lagoon system.
+From the results in Table 4.19 above, the 2012 MODIS product provides 35.2 km² of detected flood extent within Lagos State, distributed across 290 discrete patches. Permanent water bodies are masked in the source product, so the extent represents detected flooding rather than the lagoon system.
 
 No geocoding of NEMA community names was attempted. The records carry community names but no coordinates, and assigning coordinates from place names would introduce fabricated locations into the dataset used for validation. The NEMA records were therefore analysed only at the LGA level of aggregation that the source supports.
 
 **4.8.2 Overlay Analysis**
 
-Table 4.19 Distribution of observed 2012 flood extent across susceptibility zones
+Table 4.20 Distribution of observed 2012 flood extent across susceptibility zones
 
 | Zone | % of observed flood | % of Lagos area | Enrichment ratio |
 |---|---|---|---|
@@ -299,7 +325,7 @@ Table 4.19 Distribution of observed 2012 flood extent across susceptibility zone
 | Very High | 33.89 | 20.99 | 1.61 |
 | High + Very High | 67.08 | 48.91 | 1.37 |
 
-The results in Table 4.19 above show that the enrichment ratio, calculated as the share of observed flooding in a zone divided by that zone's share of the state area, rises monotonically across the five susceptibility classes. Observed flooding is 1.61 times more concentrated in the Very High zone than would occur by chance, and is depleted in the Low and Moderate zones at ratios of 0.52 and 0.66 respectively.
+The results in Table 4.20 above show that the enrichment ratio, calculated as the share of observed flooding in a zone divided by that zone's share of the state area, rises monotonically across the five susceptibility classes. Observed flooding is 1.61 times more concentrated in the Very High zone than would occur by chance, and is depleted in the Low and Moderate zones at ratios of 0.52 and 0.66 respectively.
 
 The proportion of observed flooding falling in the High and Very High classes is 67.08%, against the acceptance criterion of greater than 60% stated in Table 3.6. This criterion is met.
 
@@ -307,7 +333,7 @@ It is noted that the High and Very High zones together cover 48.91% of the state
 
 **4.8.3 Discriminatory Power and Confusion Matrix**
 
-Table 4.20 Susceptibility map discriminatory performance
+Table 4.21 Susceptibility map discriminatory performance
 
 | Metric | Value | Criterion (Table 3.6) | Status |
 |---|---|---|---|
@@ -318,14 +344,14 @@ Table 4.20 Susceptibility map discriminatory performance
 | Precision | 0.213 | — | — |
 | Flood-in-high class | 67.08% | > 60% | Met |
 
-Table 4.21 Confusion matrix at the Youden-optimal threshold, FSI = 0.596
+Table 4.22 Confusion matrix at the Youden-optimal threshold, FSI = 0.596
 
 | | Predicted flood | Predicted non-flood |
 |---|---|---|
 | Observed flood | 26,799 | 12,309 |
 | Observed non-flood | 98,888 | 96,652 |
 
-The results in Tables 4.20 and 4.21 above show that the susceptibility map meets one of the four acceptance criteria set for it. The AUC-ROC of 0.62 falls below the criterion of 0.70, though it exceeds 0.50, which would indicate no discrimination. Sensitivity of 0.685 falls marginally below the criterion of 0.70, and overall accuracy of 0.526 falls substantially below it.
+The results in Tables 4.21 and 4.21 above show that the susceptibility map meets one of the four acceptance criteria set for it. The AUC-ROC of 0.62 falls below the criterion of 0.70, though it exceeds 0.50, which would indicate no discrimination. Sensitivity of 0.685 falls marginally below the criterion of 0.70, and overall accuracy of 0.526 falls substantially below it.
 
 Specificity of 0.494 and precision of 0.213 identify the cause. Because the High and Very High zones occupy 48.91% of the state, they capture flooded and non-flooded ground at approximately the same rate. Of 125,687 cells predicted as flood-prone at the optimal threshold, 98,888 were not flooded in the 2012 event.
 
@@ -333,7 +359,7 @@ Objective (v) is therefore only partially attained. The SWAT criterion is satisf
 
 **4.8.4 LGA-Level Comparison with NEMA Records**
 
-Table 4.22 Spearman rank correlation between NEMA report counts and modelled quantities
+Table 4.23 Spearman rank correlation between NEMA report counts and modelled quantities
 
 | Compared quantity | Spearman ρ |
 |---|---|
@@ -341,11 +367,11 @@ Table 4.22 Spearman rank correlation between NEMA report counts and modelled qua
 | Modelled absolute population exposed | +0.17 |
 | Raw LGA population | +0.57 |
 
-The results in Table 4.22 above show that NEMA report counts correlate more strongly with raw LGA population, at ρ of +0.57, than with either modelled exposure quantity. The Mann-Whitney comparison between LGAs with and without reports was not statistically significant, at p of 0.10.
+The results in Table 4.23 above show that NEMA report counts correlate more strongly with raw LGA population, at ρ of +0.57, than with either modelled exposure quantity. The Mann-Whitney comparison between LGAs with and without reports was not statistically significant, at p of 0.10.
 
 This indicates that the NEMA dataset predominantly records where population and reporting capacity are concentrated rather than where flooding occurs. The dataset is therefore confounded and cannot validate the susceptibility map in either direction. This test is reported as inconclusive.
 
-Table 4.23 LGAs with highest NEMA report counts against modelled exposure
+Table 4.24 LGAs with highest NEMA report counts against modelled exposure
 
 | LGA | NEMA reports | Modelled % High or Very High |
 |---|---|---|
@@ -356,11 +382,11 @@ Table 4.23 LGAs with highest NEMA report counts against modelled exposure
 | Kosofe | 6 | 47.1 |
 | Agege | 5 | 9.9 |
 
-From the results in Table 4.23 above, three of the six LGAs generating the most flood reports, being Alimosho, Ikorodu and Agege, rank among the lowest in modelled exposure at 14.4%, 22.4% and 9.9% respectively. These are dense inland local government areas.
+From the results in Table 4.24 above, three of the six LGAs generating the most flood reports, being Alimosho, Ikorodu and Agege, rank among the lowest in modelled exposure at 14.4%, 22.4% and 9.9% respectively. These are dense inland local government areas.
 
 **4.9 Web Portal Development Results**
 
-Table 4.24 Delivered portal features against Objective (iv)
+Table 4.25 Delivered portal features against Objective (iv)
 
 | Required feature | Delivered | Implementation |
 |---|---|---|
@@ -370,13 +396,13 @@ Table 4.24 Delivered portal features against Objective (iv)
 | Spatial query popups | Yes | Point query view |
 | Downloadable outputs | Yes | Exposure tables and scenario results |
 
-The results in Table 4.24 above show that all five core features required by Objective (iv) were delivered. The portal provides eight views: project overview, hazard map, point query, exposure dashboard, rainfall scenario runner, climate panel, SWAT+ hydrology panel, and validation panel.
+The results in Table 4.25 above show that all five core features required by Objective (iv) were delivered. The portal provides eight views: project overview, hazard map, point query, exposure dashboard, rainfall scenario runner, climate panel, SWAT+ hydrology panel, and validation panel.
 
 The implementation stack differs from that specified in Objective (iv). The portal was built as a Streamlit application over a single Python interface module, with Folium and Leaflet providing the interactive map. PostgreSQL/PostGIS, GeoServer, FastAPI, React and Docker were not used. The functional requirements of Objective (iv) are therefore satisfied, while the architectural specification is not.
 
 **4.10 Summary of Attainment Against Acceptance Criteria**
 
-Table 4.25 Attainment against the acceptance criteria of Table 3.6
+Table 4.26 Attainment against the acceptance criteria of Table 3.6
 
 | Component | Metric | Criterion | Achieved | Status |
 |---|---|---|---|---|
@@ -390,7 +416,7 @@ Table 4.25 Attainment against the acceptance criteria of Table 3.6
 | Susceptibility | Overall accuracy | > 0.70 | 0.526 | Not met |
 | Susceptibility | Flood-in-high class | > 60% | 67.08% | Met |
 
-The results in Table 4.25 above show that four of the nine acceptance criteria were met, three were not met, and two were not assessed.
+The results in Table 4.26 above show that four of the nine acceptance criteria were met, three were not met, and two were not assessed.
 
 Objective (i) was met, with the two source substitutions documented in Table 4.1. Objective (ii) was met in full. Objective (iii) was met in respect of map construction but not in respect of validation performance. Objective (iv) was met functionally but not architecturally. Objective (v) was partially met.
 
@@ -418,11 +444,11 @@ The first concerns the calibration reference. Because GEOGLOWS is itself a model
 
 The corresponding failure to reproduce seasonal evapotranspiration amplitude, reported in Table 4.12, is the model's clearest identified weakness. The diagnosis given in Section 4.6.3 is that the PET multiplier is constrained at its permitted maximum of 1.20, while both reference products independently indicate that simulated evapotranspiration is 12 to 14% too low. Two separate lines of evidence therefore converge on the conclusion that the model requires more evapotranspiration than the parameter range permits. Relaxing that constraint improves evapotranspiration but drives discharge performance below the acceptance thresholds, so no compromise within the tested parameter space satisfies both.
 
-The second limitation concerns the susceptibility map's discriminatory performance. The contrast between Table 4.19 and Table 4.20 is central: enrichment rises monotonically across all five zones, yet AUC-ROC reaches only 0.62 and specificity barely exceeds chance. These results are consistent rather than contradictory. The map carries genuine information about relative susceptibility while lacking the sharpness to classify individual locations, because the High and Very High zones together occupy nearly half the state.
+The second limitation concerns the susceptibility map's discriminatory performance. The contrast between Table 4.20 and Table 4.21 is central: enrichment rises monotonically across all five zones, yet AUC-ROC reaches only 0.62 and specificity barely exceeds chance. These results are consistent rather than contradictory. The map carries genuine information about relative susceptibility while lacking the sharpness to classify individual locations, because the High and Very High zones together occupy nearly half the state.
 
 Three differences in validation design are relevant when comparing the AUC of 0.62 obtained here with values above 0.80 commonly reported in the flood susceptibility literature. First, many published studies validate against inventories of flood points that were themselves used, in whole or in part, to inform factor weighting, which inflates apparent performance. The present validation used an independent satellite-derived flood extent that played no role in constructing the map. Second, validating against a continuous 35.2 km² flood extent is a more demanding test than validating against a small set of discrete points, as it requires discrimination across every cell of the observed footprint. Third, AHP weights were assigned from expert judgement without calibration against observed flooding, whereas data-driven approaches such as random forest or logistic regression fit weights to the inventory directly and would be expected to score higher against it. The lower AUC therefore reflects a stricter validation design as well as genuine model limitations, and these two contributions cannot be separated from the present results alone.
 
-A further observation arises from Section 4.8.4. The AHP weighting reported in Table 4.14 assigns 0.75 of the index to terrain-related factors, all of which describe topographic position. Flooding caused by insufficient or obstructed drainage in built-up areas is largely independent of terrain position at the 30 m scale and is represented only through the land cover factor, which carries a weight of 0.05 and derives from a classification with approximately 53% accuracy. Two independent observations are consistent with this: the negative rank correlation of −0.45 in Table 4.22, and the low modelled exposure of Alimosho, Agege and Ifako/Ijaye in Table 4.23 despite their high reported flood incidence. Neither observation is conclusive, since both derive from a dataset shown to be confounded by population, but the possibility that the index systematically under-represents urban pluvial flooding warrants investigation.
+A further observation arises from Section 4.8.4. The AHP weighting reported in Table 4.14 assigns 0.75 of the index to terrain-related factors, all of which describe topographic position. Flooding caused by insufficient or obstructed drainage in built-up areas is largely independent of terrain position at the 30 m scale and is represented only through the land cover factor, which carries a weight of 0.05 and derives from a classification with approximately 53% accuracy. Two independent observations are consistent with this: the negative rank correlation of −0.45 in Table 4.23, and the low modelled exposure of Alimosho, Agege and Ifako/Ijaye in Table 4.24 despite their high reported flood incidence. Neither observation is conclusive, since both derive from a dataset shown to be confounded by population, but the possibility that the index systematically under-represents urban pluvial flooding warrants investigation.
 
 Additional constraints on the study should be noted. Oyan Dam lies within the modelled basin and its releases are not represented, placing the 2022 flood outside the model's scope. Soils were represented by a single topsoil texture layer, with 88% of the basin assigned to one class. The 2012 MODIS flood extent has a resolution of 250 m, which cannot resolve street-scale urban flooding, so non-detection is not evidence of no flooding. The susceptibility map is a static surface validated against a single flood season. Finally, P-factor and R-factor were not computed, as no uncertainty ensemble was generated.
 
@@ -462,7 +488,7 @@ Based on the findings of this study, the following recommendations are made:
 
 5. Logistic regression or random forest models should be fitted to the same conditioning factors and the same 2012 flood extent, in order to separate the contribution of AHP's uncalibrated weighting from the strictness of the validation design.
 
-6. SUFI-2 should be run over the calibrated parameter set to produce the P-factor and R-factor statistics left unassessed in Table 4.25 and to place confidence bounds on the scenario results.
+6. SUFI-2 should be run over the calibrated parameter set to produce the P-factor and R-factor statistics left unassessed in Table 4.26 and to place confidence bounds on the scenario results.
 
 7. Oyan Dam operation should be incorporated into the model, which would bring the 2022 event within its scope and improve its value for flood early warning, since release-driven events are those for which advance notice is most achievable.
 

@@ -81,6 +81,40 @@ This states the target and commits to reporting the result, without promising an
 
 ---
 
+## CRITICAL 4b — §3.6.3 Table 3.4: the pairwise matrix describes a different model
+
+**Current text:** Table 3.4 gives an 8×8 pairwise comparison matrix over the factors Elev, Slope, FlowAcc, DistRiv, LandCov, **Soil**, Rain and **SWAT**, followed by the note: *"This is an illustrative matrix. Final values will be refined based on literature synthesis and sensitivity analysis."*
+
+**Two problems.**
+
+*First, the factor set is wrong.* The delivered model uses elevation, **TWI**, distance to rivers, flow accumulation, **runoff (SCS-CN)**, slope, extreme rainfall and land cover. Table 3.4 contains **Soil** and **SWAT**, neither of which is a factor in the delivered index, and omits **TWI**, which carries the second-heaviest weight at 0.18. The matrix cannot have produced the weights that were used.
+
+*Second, it is labelled illustrative.* A thesis cannot report a Consistency Ratio derived from a matrix it describes as provisional.
+
+**What the numbers show.** Table 3.4 as printed is perfectly reciprocal and is internally consistent, giving **CR = 0.0074**. But its weights are:
+
+| Factor | Table 3.4 weight | Delivered weight |
+|---|---|---|
+| DistRiv | **0.259** (highest) | 0.15 |
+| Elev | 0.190 | **0.20** (highest) |
+| FlowAcc | 0.111 | 0.12 |
+| Rain | 0.111 | 0.08 |
+| Slope | 0.106 | 0.10 |
+| SWAT | 0.106 | — (not a factor) |
+| LandCov | 0.060 | 0.05 |
+| Soil | 0.058 | — (not a factor) |
+| TWI | — (absent) | **0.18** |
+
+Table 3.4 makes distance to rivers the dominant factor; the delivered model makes elevation dominant and TWI second.
+
+**Action.** Replace Table 3.4 with the matrix over the eight factors actually used, remove the "illustrative" note, and report its CR. Chapter Four §4.7.1 now contains such a matrix, giving **CR = 0.0115** against the criterion of ≤ 0.10, and reproducing the applied weights to within 0.012.
+
+**Important:** that matrix was reconstructed from the weights, because the original is not recorded anywhere in the project files. If you still have the matrix you actually built, use it instead — that is the correct route. If you do not, review every judgement in the reconstructed matrix against your own reasoning before adopting it, and re-run `validation/ahp_consistency.py` after any change. The judgements have to be ones you can defend orally.
+
+Do not be tempted to build the matrix as exactly a_ij = w_i/w_j. That produces CR = 0.000 for any weight vector whatsoever and demonstrates nothing; the script shows this case explicitly.
+
+---
+
 ## FACTUAL 5 — §3.3.2: the DEM was Copernicus GLO-30, not SRTM
 
 **Current text:** "the study employed the Shuttle Radar Topography Mission (SRTM) Digital Elevation Model (DEM) for this study. **Dataset:** SRTM DEM Version 3.0 (SRTM GL1)…"
@@ -165,10 +199,11 @@ Four items from the completed work belong in the limitations section:
 
 1. **CRITICAL 4** (§3.7 portal architecture) — largest volume of text.
 2. **CRITICAL 1** (§3.5.5 calibration procedure) — including Table 3.2 and the P/R-factor consequence.
-3. **CRITICAL 3** (AUC threshold) — reconcile the contradiction, one number throughout.
-4. **CRITICAL 2** (simulation periods) — mechanical, quick.
-5. **FACTUAL 5–8** — data sources, mostly localised edits.
-6. **CONSISTENCY 9–10** and the §1.6 additions.
+3. **CRITICAL 4b** (§3.6.3 Table 3.4 pairwise matrix) — replace with the matrix over the eight factors actually used.
+4. **CRITICAL 3** (AUC threshold) — reconcile the contradiction, one number throughout.
+5. **CRITICAL 2** (simulation periods) — mechanical, quick.
+6. **FACTUAL 5–8** — data sources, mostly localised edits.
+7. **CONSISTENCY 9–10** and the §1.6 additions.
 
 ---
 
