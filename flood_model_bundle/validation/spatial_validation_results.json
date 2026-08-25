@@ -5,6 +5,27 @@
     "flood_area_km2": 35.2,
     "lagos_cells": 4202132,
     "auc_roc": 0.62,
+    "confusion_matrix_youden": {
+      "threshold": 0.596,
+      "TP": 26799,
+      "FN": 12309,
+      "FP": 98888,
+      "TN": 96652,
+      "sensitivity": 0.685,
+      "specificity": 0.494,
+      "overall_accuracy": 0.526,
+      "precision": 0.213,
+      "youden_j": 0.18
+    },
+    "thesis_thresholds": {
+      "auc_roc_target": 0.7,
+      "auc_roc_met": false,
+      "sensitivity_target": 0.7,
+      "sensitivity_met": false,
+      "overall_accuracy_target": 0.7,
+      "overall_accuracy_met": false,
+      "flood_in_high_class_target_pct": 60.0
+    },
     "mean_hazard_index_flooded": 0.698,
     "mean_hazard_index_lagos": 0.6337,
     "zones": {

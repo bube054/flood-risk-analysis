@@ -98,6 +98,34 @@ def auc_roc(pos, neg):
     return (r_pos - n1 * (n1 + 1) / 2) / (n1 * n0)
 
 
+def confusion_at_youden(pos, neg):
+    """Confusion matrix at the Youden-optimal FSI threshold (thesis sec.3.8.2 Step 3).
+
+    J = sensitivity + specificity - 1, maximised over candidate thresholds.
+    Returns the threshold plus sensitivity/specificity/accuracy/precision, so
+    Table 3.6's remaining acceptance criteria can actually be reported.
+    """
+    cand = sorted(set(round(v, 3) for v in list(pos) + list(neg)))
+    best = None
+    for t in cand:
+        tp = sum(1 for v in pos if v >= t)
+        fn = len(pos) - tp
+        fp = sum(1 for v in neg if v >= t)
+        tn = len(neg) - fp
+        sens = tp / (tp + fn) if tp + fn else 0.0
+        spec = tn / (tn + fp) if tn + fp else 0.0
+        j = sens + spec - 1
+        if best is None or j > best["youden_j"]:
+            best = {
+                "threshold": t, "TP": tp, "FN": fn, "FP": fp, "TN": tn,
+                "sensitivity": round(sens, 3), "specificity": round(spec, 3),
+                "overall_accuracy": round((tp + tn) / (tp + tn + fp + fn), 3),
+                "precision": round(tp / (tp + fp), 3) if tp + fp else 0.0,
+                "youden_j": round(j, 3),
+            }
+    return best
+
+
 def spearman(x, y):
     def rank(v):
         order = sorted(range(len(v)), key=lambda i: v[i])
@@ -186,6 +214,7 @@ def test_a():
     absence = np.random.default_rng(42).choice(lagos_vals, size=n_abs, replace=False)
 
     auc = auc_roc(flood_vals.tolist(), absence.tolist())
+    cm = confusion_at_youden(flood_vals.tolist(), absence.tolist())
 
     # zone enrichment
     enrich = {}
@@ -207,6 +236,16 @@ def test_a():
         "flood_area_km2": round(len(flood_vals) * 900 / 1e6, 1),
         "lagos_cells": int(len(lagos_vals)),
         "auc_roc": round(auc, 3),
+        "confusion_matrix_youden": cm,
+        "thesis_thresholds": {
+            "auc_roc_target": 0.70,
+            "auc_roc_met": auc >= 0.70,
+            "sensitivity_target": 0.70,
+            "sensitivity_met": cm["sensitivity"] >= 0.70,
+            "overall_accuracy_target": 0.70,
+            "overall_accuracy_met": cm["overall_accuracy"] >= 0.70,
+            "flood_in_high_class_target_pct": 60.0,
+        },
         "mean_hazard_index_flooded": round(float(flood_vals.mean()), 4),
         "mean_hazard_index_lagos": round(float(lagos_vals.mean()), 4),
         "zones": enrich,
@@ -302,6 +341,22 @@ def main():
     print(f"\n  High+VeryHigh: {a['high_veryhigh_pct_of_flood']}% of flood vs "
           f"{a['high_veryhigh_pct_of_lagos']}% of Lagos "
           f"-> enrichment {a['high_veryhigh_enrichment']}x")
+
+    c = a["confusion_matrix_youden"]
+    t = a["thesis_thresholds"]
+    print(f"\n  confusion matrix at Youden-optimal FSI = {c['threshold']}")
+    print(f"    TP {c['TP']:,}  FN {c['FN']:,}  FP {c['FP']:,}  TN {c['TN']:,}")
+    print(f"    sensitivity {c['sensitivity']}   specificity {c['specificity']}")
+    print(f"    overall accuracy {c['overall_accuracy']}   precision {c['precision']}")
+    print("\n  vs thesis Table 3.6 acceptance criteria:")
+    print(f"    AUC-ROC     {a['auc_roc']:.2f} vs >0.70  ->  "
+          f"{'MET' if t['auc_roc_met'] else 'NOT MET'}")
+    print(f"    Sensitivity {c['sensitivity']:.2f} vs >=0.70 ->  "
+          f"{'MET' if t['sensitivity_met'] else 'NOT MET'}")
+    print(f"    Overall acc {c['overall_accuracy']:.2f} vs >0.70  ->  "
+          f"{'MET' if t['overall_accuracy_met'] else 'NOT MET'}")
+    print(f"    Flood-in-high {a['high_veryhigh_pct_of_flood']:.1f}% vs >60% ->  "
+          f"{'MET' if a['high_veryhigh_pct_of_flood'] > 60 else 'NOT MET'}")
 
     print("\n" + "=" * 66)
     print("TEST B - LGA level vs NEMA 2022 reports")
