@@ -49,6 +49,17 @@ st.markdown("""
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
 }
 
+/* Streamlit draws its icons as Material Symbols ligatures. The universal
+   rule above would override the icon font too, and a ligature rendered in
+   Inter shows its literal name — expanders printed "keyboard_arrow_right"
+   on top of their labels. Exempt icon elements from the override. */
+[data-testid="stIconMaterial"],
+span[class*="material-symbols"],
+.material-symbols-rounded {
+    font-family: 'Material Symbols Rounded' !important;
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
 /* Hide default branding */
 #MainMenu, footer, header {visibility: hidden;}
 
@@ -455,10 +466,13 @@ with st.sidebar:
     st.markdown("""
     <div style="font-size:0.82rem; line-height:1.7; color:#94a3b8;">
         <strong style="color:#cbd5e1;">Title:</strong><br>
-        Flood Hazard Mapping &amp; Population Exposure Analysis for Lagos State, Nigeria<br><br>
+        Flood Risk Analysis and Visualization Web Portal for Lagos State, Nigeria<br><br>
         <strong style="color:#cbd5e1;">Student:</strong><br>
-        Attah Gbubemi David<br><br>
+        Attah Gbubemi David (190402060)<br><br>
+        <strong style="color:#cbd5e1;">Supervisor:</strong><br>
+        Dr O. C. Echeta<br><br>
         <strong style="color:#cbd5e1;">Institution:</strong><br>
+        Department of Civil &amp; Environmental Engineering<br>
         University of Lagos<br><br>
         <strong style="color:#cbd5e1;">Model:</strong><br>
         AHP Multi-Criteria (8 factors)<br>
@@ -516,7 +530,7 @@ with tab_overview:
     st.markdown("""
     <div style="max-width:900px;">
         <h2 style="color:#e2e8f0; font-weight:700; margin-bottom:0.5rem;">
-            Flood Hazard Mapping &amp; Population Exposure Analysis
+            Flood Risk Analysis and Visualization Web Portal
         </h2>
         <p style="color:#64748b; font-size:0.9rem; font-style:italic; margin-bottom:1.2rem;">
             Lagos State, Nigeria — Final Year Project
@@ -590,19 +604,44 @@ with tab_overview:
 
     with st.expander("📚 Data Sources & Limitations", expanded=False):
         st.markdown("""
+        **Statewide hazard & exposure model (AHP)**
+
         | Dataset | Source | Resolution / Period |
         |---------|--------|---------------------|
-        | Elevation (DEM) | SRTM / Copernicus | 30 m |
-        | Land Use / Land Cover | Sentinel-2 (RF classification) | 10 m |
-        | Rainfall | NIMET Ikeja station + CHIRPS validation | 1996–2025 (31 yr) |
-        | Population | WorldPop 2020 | ~100 m |
-        | Administrative boundaries | GADM / Lagos Bureau of Statistics | 20 LGAs |
-        | Rivers / drainage | OpenStreetMap + manual digitization | — |
+        | Elevation (DEM) | SRTM | 30 m |
+        | Land Use / Land Cover | Sentinel-2 (Random Forest classification) | 10 m |
+        | Rainfall | NiMet Ikeja station + CHIRPS validation | 1996–2025 (30 yr) |
+        | Population | WorldPop | ~100 m |
+        | Administrative boundaries | GADM v4.1 (20 Lagos LGAs) | — |
+        | Rivers / drainage | HydroSHEDS / HydroRIVERS | 15 arc-sec |
+
+        **Ogun catchment hydrological model (SWAT+)**
+
+        | Dataset | Source | Resolution / Period |
+        |---------|--------|---------------------|
+        | Elevation (DEM) | Copernicus GLO-30 | 30 m → 90 m |
+        | Land cover | ESA WorldCover v200 | 10 m → 90 m |
+        | Soil | SoilGrids, 0–5 cm sand/clay | 250 m → 90 m |
+        | Rainfall forcing | CHIRPS daily, 23 subbasin stations | 2010–2023 |
+        | Temperature forcing | ERA5-Land daily tmax/tmin | 2010–2023 |
+        | Discharge (calibration) | GEOGLOWS v2, reach 140585128 | Monthly, 2011–2023 |
+
+        **Independent validation data**
+
+        | Dataset | Source | Used for |
+        |---------|--------|----------|
+        | MOD16A2GF evapotranspiration | MODIS / NASA | SWAT+ ET check |
+        | TerraClimate actual ET | Abatzoglou et al. (2018) | Second ET reference |
+        | Flood extent, Jul–Nov 2012 | MODIS 250 m (NASA/DFO via HDX) | Hazard map validation |
+        | Flood reports, 2022 | NEMA via HDX (62 Lagos records) | LGA-level check |
 
         **Limitations:**
         - The LULC classification has **~53% overall accuracy** — don't overstate fine-grained land-use effects.
         - AHP is a **multi-criteria index**, not a calibrated hydraulic model (no flood depth/velocity).
-        - Population data is from 2020; actual population may differ.
+        - The hazard map **ranks** susceptibility well (enrichment rises to 1.61× in Very High) but
+          discriminates weakly: AUC-ROC 0.62, below the 0.70 acceptance threshold.
+        - SWAT+ was calibrated against **modelled** (GEOGLOWS) rather than gauged discharge.
+        - Oyan Dam releases are not modelled, so the 2022 flood is outside the model's scope.
         - Scenario exposure numbers should be interpreted as **relative changes**, not absolute predictions.
         """)
 
@@ -1004,7 +1043,7 @@ with tab_climate:
         Climate Analysis &amp; Trend Center
     </h3>
     <p style="color:#64748b; font-size:0.85rem; margin-bottom:0.8rem;">
-        31-year analysis of NIMET Ikeja station data (1996–2025): rainfall trends,
+        30-year analysis of NiMet Ikeja station data (1996–2025): rainfall trends,
         temperature, humidity, and Gumbel return-period estimates.
     </p>
     """, unsafe_allow_html=True)
@@ -1058,7 +1097,7 @@ with tab_climate:
 
     chart_files = [
         ("fig_nimet_climatology.png", "Monthly Climatology",
-         "31-year mean monthly rainfall, temperature, and relative humidity at Ikeja."),
+         "30-year mean monthly rainfall, temperature, and relative humidity at Ikeja."),
         ("fig_nimet_rainfall_trend.png", "Annual Rainfall Trend",
          "Annual total rainfall with Mann-Kendall trend test (no significant trend detected)."),
         ("fig_nimet_temp_rh_trend.png", "Temperature & Humidity Trends",

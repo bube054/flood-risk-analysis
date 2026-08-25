@@ -26,7 +26,7 @@ flood_model_bundle/
     │   ├── exposure_by_zone.csv        exact statewide exposure by zone
     │   ├── lagos_lgas.geojson          20 LGA polygons (WGS84) for the map
     │   ├── nimet_summary.json          Gumbel return-period model params
-    │   ├── nimet_climatology.csv       31-yr monthly climate
+    │   ├── nimet_climatology.csv       30-yr monthly climate
     │   ├── nimet_annual_series.csv     annual rainfall/temp/humidity series
     │   └── fig_nimet_*.png             5 ready-made NIMET charts
     └── factors/          (~284 MB) — only needed for the RAINFALL SCENARIO tab
@@ -49,7 +49,7 @@ the 284 MB `factors/` folder. The scenario tab needs `factors/`.
 | 1 | **Flood Hazard** (AHP weighted overlay of 8 factors) | where Lagos is flood-prone | `point_query(lat, lon)`, `hazard_zones_array()` |
 | 2 | **Population exposure** | people per hazard zone / LGA | `exposure_by_lga()`, `exposure_by_zone()`, `real_baseline_exposure()` |
 | 3 | **NIMET Gumbel return-period** | design rainfall for a return period | `design_rainfall(years)`, `return_period(mm)` |
-| 4 | **NIMET climatology** | 31-yr seasonal cycle | `climatology()` |
+| 4 | **NIMET climatology** | 30-yr seasonal cycle | `climatology()` |
 | 5 | **Rainfall scenario (live recompute)** | new map + exposure if rainfall changes | `recompute_hazard(scale)`, `scenario_exposure(scale)` |
 
 Helpers: `lga_boundaries()` (GeoDataFrame), `ZONE_NAMES`, `WEIGHTS`.

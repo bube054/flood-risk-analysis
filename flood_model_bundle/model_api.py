@@ -77,7 +77,7 @@ def exposure_by_zone():
 
 
 def climatology():
-    """DataFrame: 31-yr NIMET monthly climatology (rain/temp/RH)."""
+    """DataFrame: 30-yr NiMet monthly climatology (rain/temp/RH)."""
     return pd.read_csv(_core("nimet_climatology.csv"))
 
 

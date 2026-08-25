@@ -10,7 +10,7 @@ the original analysis pipeline is NOT here, and you do **not** need it. Everythi
 
 A final-year civil/environmental engineering project: **flood hazard mapping for Lagos State,
 Nigeria** (student: Attah Gbubemi David). The full study already produced a flood hazard map,
-population-exposure analysis, and a 31-year climate (NIMET) analysis. The analysis is **done** —
+population-exposure analysis, and a 30-year climate (NiMet) analysis. The analysis is **done** —
 this bundle packages the finished models so they can be served interactively.
 
 ## 2. What we want to build
@@ -48,7 +48,7 @@ M.return_period(3932)            # ~289 yr
 M.exposure_by_lga()              # DataFrame (20 LGAs)
 M.exposure_by_zone()             # DataFrame (5 zones, exact totals)
 M.real_baseline_exposure()       # dict: exact baseline people per zone
-M.climatology()                  # DataFrame: 31-yr monthly rain/temp/RH
+M.climatology()                  # DataFrame: 30-yr monthly rain/temp/RH
 M.lga_boundaries()               # GeoDataFrame (WGS84)
 exp, zones = M.scenario_exposure(1.3)   # +30% rainfall; exp[zone]={people,delta,pct_change}
 M.recompute_hazard(scale)        # (fhi, zones, ref) for the scenario map
