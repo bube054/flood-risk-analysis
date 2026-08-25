@@ -3,38 +3,103 @@
  * ========================================================
  *
  * Paste into the Google Earth Engine Code Editor (code.earthengine.google.com)
- * and press Run. Exports one CSV to your Google Drive.
+ * and press Run, then run the export task that appears under the Tasks tab.
+ * Exports one CSV to your Google Drive.
  *
  * WHY YOU NEED TO RUN THIS YOURSELF
  * ---------------------------------
- * MOD16 is only reachable through Google Earth Engine or NASA Earthdata, both
- * of which require an interactive OAuth login. The no-login alternative (ORNL
- * DAAC MODIS REST API) was returning HTTP 500 on every endpoint when the
- * validation was built, so `et_validation.py` fell back to TerraClimate.
+ * MOD16 is reachable only through Google Earth Engine or NASA Earthdata, both
+ * of which require an interactive OAuth login. It cannot be run headlessly.
  *
- * TerraClimate is a climatic water-balance product, NOT a satellite retrieval.
- * MOD16 is a true satellite ET product and is what Odusanya et al. (2019) used.
- * Running this upgrades the validation from "independent gridded reference" to
- * "independent satellite observation" -- a materially stronger claim, and the
- * one your supervisor actually asked for.
+ * THE AOI IS THE REAL BASIN, NOT A BOUNDING BOX
+ * ---------------------------------------------
+ * An earlier version used a rectangle around the catchment. That was wrong
+ * enough to matter: the rectangle is 40,397 km2 against the basin's 19,915
+ * km2, so roughly HALF of every sampled pixel lay outside the watershed and the
+ * basin-mean ET was diluted by land that does not drain to the outlet.
+ *
+ * The polygon below is the delineated SWAT+ watershed (ogun_dem_90m_clipwshed
+ * .shp, 71 subbasins dissolved), reprojected to WGS84 and simplified with a
+ * 500 m tolerance: 303 vertices, area error 0.033% (19,915 ->
+ * 19,908 km2). Inlining it avoids uploading a GEE asset at all.
+ *
+ * DO NOT EDIT THE COORDINATES BY HAND -- regenerate with:
+ *     python make_gee_aoi.py
+ *
+ * UNITS: MOD16A2GF `ET` is an 8-day total in 0.1 mm. This sums the 8-day
+ * composites within each month and applies the 0.1 scale, giving mm/month --
+ * directly comparable to SWAT+ `basin_wb_mon.txt` column `et`.
  *
  * AFTER RUNNING
  * -------------
- * 1. Download `mod16_et_ogun_monthly.csv` from Drive.
- * 2. Drop it next to et_validation.py.
- * 3. Run:  python et_validation.py --reference mod16_et_ogun_monthly.csv
- *    (the script reads the MOD16 CSV instead of the TerraClimate netCDFs)
- *
- * NOTE ON UNITS: MOD16A2GF `ET` is 8-day total in 0.1 mm. This script sums the
- * 8-day composites within each month and applies the 0.1 scale factor, giving
- * mm/month -- directly comparable to SWAT+ `basin_wb_mon.txt` column `et`.
+ * 1. Download `mod16_et_ogun_monthly_basin.csv` from Drive.
+ * 2. Put it in flood_model_bundle/swat/validation/.
+ * 3. Run: python et_validation.py --reference mod16_et_ogun_monthly_basin.csv
  */
 
-// ── Basin geometry ─────────────────────────────────────────────────────────
-// Bounding box of the delineated SWAT+ watershed (see METHODOLOGY_LOG sec.3.4).
-// For an exact basin mean, upload ogun_dem_90m_clipwshed.shp as a GEE asset
-// and replace this rectangle with: ee.FeatureCollection('users/<you>/ogun_wshed')
-var AOI = ee.Geometry.Rectangle([2.6, 6.55, 3.9, 9.1]);
+// ── Basin geometry: delineated Ogun watershed (303 vertices, WGS84) ─────────
+var AOI = ee.Geometry.Polygon([[
+  [3.297,6.7214],[3.2685,6.7304],[3.2538,6.7686],[3.2408,6.7768],[3.2465,6.8004],
+  [3.2343,6.8061],[3.2343,6.8224],[3.2213,6.8289],[3.2156,6.8411],[3.1846,6.8485],
+  [3.183,6.859],[3.1708,6.8607],[3.1618,6.8721],[3.1382,6.8696],[3.1187,6.8941],
+  [3.1072,6.8908],[3.0893,6.9136],[3.0747,6.9136],[3.069,6.9323],[3.047,6.9381],
+  [3.0633,6.9682],[3.0576,6.9845],[3.0657,6.9991],[3.0665,7.0081],[3.0608,7.0089],
+  [3.0649,7.0268],[3.0559,7.0341],[3.0649,7.0333],[3.0657,7.048],[3.0926,7.0537],
+  [3.1065,7.0716],[3.122,7.0773],[3.1228,7.0935],[3.1326,7.096],[3.1399,7.122],
+  [3.1375,7.1489],[3.1187,7.1611],[3.1138,7.1937],[3.0894,7.1986],[3.1245,7.2564],
+  [3.1122,7.2621],[3.109,7.2743],[3.0894,7.2775],[3.0829,7.2889],[3.0886,7.3036],
+  [3.0723,7.3101],[3.0584,7.3272],[3.047,7.3752],[3.0315,7.3793],[3.0168,7.3956],
+  [3.0201,7.4021],[3.0046,7.3972],[2.9932,7.4037],[2.9907,7.4176],[2.981,7.4192],
+  [2.9687,7.4485],[2.9793,7.4794],[2.9581,7.4811],[2.9451,7.4925],[2.9377,7.5096],
+  [2.9426,7.5169],[2.9108,7.525],[2.8863,7.5104],[2.8863,7.4998],[2.8684,7.4811],
+  [2.839,7.4859],[2.839,7.5055],[2.8553,7.538],[2.8414,7.5641],[2.8267,7.573],[2.821,7.6015],
+  [2.7819,7.6064],[2.7647,7.6202],[2.737,7.6056],[2.7247,7.6112],[2.7141,7.6202],
+  [2.7109,7.6373],[2.6945,7.6389],[2.697,7.6723],[2.6839,7.6918],[2.6847,7.7089],
+  [2.7181,7.783],[2.7156,7.7952],[2.7401,7.8001],[2.7458,7.818],[2.7581,7.8286],
+  [2.7556,7.8579],[2.7752,7.9125],[2.7686,7.9394],[2.78,7.9597],[2.7784,8.0045],
+  [2.8086,8.0314],[2.8249,8.0338],[2.8184,8.0761],[2.8273,8.1079],[2.8453,8.1169],
+  [2.8469,8.1413],[2.8608,8.1511],[2.8698,8.1861],[2.878,8.1958],[2.8943,8.1983],
+  [2.9008,8.2146],[2.9155,8.2178],[2.9123,8.2292],[2.9237,8.2423],[2.9319,8.2683],
+  [2.927,8.2805],[2.9351,8.2919],[2.9253,8.3115],[2.9229,8.3693],[2.9449,8.3872],
+  [2.9547,8.4238],[2.976,8.4214],[2.9768,8.4328],[2.9842,8.4328],[2.9924,8.4482],
+  [3.0095,8.4442],[3.0332,8.4507],[3.0324,8.4613],[3.0578,8.4751],[3.0463,8.5117],
+  [3.0602,8.5321],[3.0676,8.5557],[3.0627,8.5834],[3.0766,8.5948],[3.0799,8.6151],
+  [3.106,8.6094],[3.1167,8.6135],[3.1249,8.6078],[3.1249,8.598],[3.1396,8.5907],
+  [3.1494,8.6053],[3.1649,8.6118],[3.169,8.6289],[3.1862,8.6216],[3.1969,8.6313],
+  [3.2058,8.6265],[3.2181,8.6346],[3.2181,8.6606],[3.2378,8.6842],[3.2468,8.7233],
+  [3.2689,8.7404],[3.2976,8.7485],[3.3033,8.7599],[3.3295,8.7631],[3.3532,8.7362],
+  [3.3786,8.7501],[3.3884,8.7728],[3.4154,8.7818],[3.4252,8.7785],[3.4351,8.7948],
+  [3.4474,8.7931],[3.4523,8.8135],[3.4809,8.8045],[3.4916,8.8175],[3.5366,8.8174],
+  [3.5653,8.8426],[3.5661,8.8589],[3.5817,8.8735],[3.6226,8.8808],[3.6169,8.8922],
+  [3.6219,8.9117],[3.6382,8.9207],[3.6497,8.9418],[3.6604,8.9304],[3.6857,8.9312],
+  [3.7398,8.9538],[3.7504,8.9506],[3.7496,8.9286],[3.7594,8.9261],[3.7667,8.9049],
+  [3.7987,8.9114],[3.8224,8.9016],[3.8395,8.8885],[3.8477,8.8706],[3.8444,8.8511],
+  [3.904,8.8118],[3.904,8.7899],[3.8941,8.7801],[3.9039,8.776],[3.8949,8.7476],
+  [3.8981,8.7362],[3.9038,8.737],[3.9038,8.7166],[3.8972,8.7126],[3.9037,8.6751],
+  [3.8938,8.6597],[3.9036,8.6548],[3.8986,8.61],[3.9034,8.5497],[3.8689,8.5018],
+  [3.8558,8.4969],[3.8501,8.4807],[3.8558,8.4619],[3.8492,8.4514],[3.8516,8.4375],
+  [3.9031,8.4309],[3.8875,8.4106],[3.89,8.4008],[3.903,8.3967],[3.8981,8.3902],
+  [3.9029,8.3365],[3.8856,8.2975],[3.9028,8.2844],[3.897,8.2494],[3.9027,8.2339],
+  [3.8961,8.2291],[3.9026,8.2119],[3.9025,8.1769],[3.8976,8.1753],[3.9025,8.1599],
+  [3.8861,8.1224],[3.8901,8.0956],[3.9024,8.1012],[3.8974,8.0663],[3.902,7.9279],
+  [3.884,7.9075],[3.8766,7.875],[3.9018,7.8619],[3.9,7.7756],[3.8943,7.7691],[3.9016,7.752],
+  [3.881,7.6788],[3.9014,7.6625],[3.9014,7.6462],[3.894,7.6381],[3.9013,7.6039],
+  [3.8923,7.595],[3.8548,7.5893],[3.8531,7.5779],[3.8409,7.5723],[3.8465,7.5438],
+  [3.8269,7.5308],[3.8196,7.534],[3.8171,7.5259],[3.8024,7.5259],[3.7885,7.5113],
+  [3.7893,7.4991],[3.777,7.4771],[3.7656,7.4772],[3.7501,7.4658],[3.746,7.4511],
+  [3.7125,7.4365],[3.6945,7.3918],[3.6627,7.378],[3.6749,7.3617],[3.6667,7.3519],
+  [3.6618,7.321],[3.6683,7.3064],[3.661,7.2966],[3.6422,7.3064],[3.6422,7.2901],
+  [3.6088,7.2853],[3.5965,7.2682],[3.5623,7.278],[3.5541,7.2617],[3.5362,7.2512],
+  [3.515,7.2569],[3.5052,7.2398],[3.484,7.2398],[3.4872,7.2293],[3.4742,7.2073],
+  [3.4815,7.1902],[3.4717,7.1772],[3.4806,7.1592],[3.4668,7.1576],[3.4496,7.1357],
+  [3.4936,7.0778],[3.4895,7.0477],[3.5049,7.0298],[3.4992,7.0005],[3.4748,7.0029],
+  [3.4625,6.9964],[3.4478,6.9606],[3.4519,6.9557],[3.4405,6.9509],[3.425,6.9183],
+  [3.4388,6.88],[3.4258,6.8703],[3.4266,6.863],[3.4135,6.8662],[3.4184,6.8573],[3.4103,6.854],
+  [3.4184,6.8394],[3.4159,6.8231],[3.4045,6.8215],[3.4151,6.8011],[3.4037,6.7791],
+  [3.4094,6.7604],[3.3898,6.7433],[3.4102,6.7213],[3.3987,6.7213],[3.3857,6.7075],
+  [3.3857,6.692],[3.402,6.6757],[3.393,6.6749],[3.3889,6.6497],[3.38,6.6652],[3.3572,6.6766],
+  [3.3474,6.6912],[3.3417,6.6888],[3.3092,6.7238],[3.297,6.7214]
+]], null, false);   // geodesic=false: treat edges as planar lat/lon
 
 var START = '2011-01-01';
 var END   = '2023-12-31';
@@ -51,7 +116,7 @@ var monthly = ee.FeatureCollection(months.map(function (i) {
   var start = ee.Date(START).advance(i, 'month');
   var end   = start.advance(1, 'month');
 
-  // Sum the 8-day composites falling in this month, then apply 0.1 scale.
+  // Sum the 8-day composites falling in this month, then apply the 0.1 scale.
   var total = et8.filterDate(start, end).sum().multiply(0.1);
 
   var mean = total.reduceRegion({
@@ -68,12 +133,17 @@ var monthly = ee.FeatureCollection(months.map(function (i) {
   });
 }));
 
-print('First 5 months (check these are sane, ~40-120 mm):', monthly.limit(5));
+// Visual check: the red outline must trace the Ogun basin, not a rectangle.
+Map.centerObject(AOI, 7);
+Map.addLayer(AOI, {color: 'red'}, 'Ogun basin (AOI)');
+
+print('Basin area km2 (expect ~19,900):', AOI.area(1000).divide(1e6));
+print('First 5 months (expect ~30-120 mm):', monthly.limit(5));
 
 Export.table.toDrive({
   collection: monthly,
-  description: 'mod16_et_ogun_monthly',
-  fileNamePrefix: 'mod16_et_ogun_monthly',
+  description: 'mod16_et_ogun_monthly_basin',
+  fileNamePrefix: 'mod16_et_ogun_monthly_basin',
   fileFormat: 'CSV',
   selectors: ['month', 'mod16_et_mm']
 });
