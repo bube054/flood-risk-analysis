@@ -348,34 +348,58 @@ delineated watershed:
    summed to monthly and scaled by 0.1. Exported from Google Earth Engine via
    `validation/fetch_mod16_et_gee.js` (needs an interactive GEE login — run it yourself).
    This is the product Odusanya et al. (2019) used and the one specified for this work.
+   **Sampled over the delineated basin outline**, inlined into the script by
+   `make_gee_aoi.py` — see §11.1a for why this matters.
 2. **TerraClimate `aet`** (corroborating) — ~4 km monthly climatic water balance, pulled
    from the THREDDS NCSS endpoint as per-year netCDF subsets (~56 KB each — disk-light).
    **NCSS returns raw Int16; `scale_factor = 0.1` must be applied manually.**
 
 | Reference | Monthly NSE | R² | PBIAS | Annual mm/yr |
 |---|---|---|---|---|
-| **MOD16 (satellite)** | 0.09 | 0.35 | +15.7% | **935** |
+| **MOD16 (satellite, basin AOI)** | 0.14 | 0.36 | +14.4% | **920** |
 | TerraClimate | 0.18 | 0.39 | +12.5% | 900 |
 | — SWAT+ simulated — | | | | **787** |
 
-**The two references agree with each other** (935 vs 900 mm/yr) and tell the same story,
+**The two references agree with each other** (920 vs 900 mm/yr) and tell the same story,
 which is what makes this robust rather than an artefact of one product.
 
 Monthly climatology vs MOD16 (mm):
 
 ```
        Jan   Feb   Mar   Apr   May   Jun   Jul   Aug   Sep   Oct   Nov   Dec
-MOD16 32.5  36.7  56.7  64.7  85.9 100.0 110.1 113.2 113.9  88.6  84.0  46.0
+MOD16 27.8  32.1  53.7  65.0  87.0 101.7 110.2 112.3 113.6  88.5  83.2  41.9
 SWAT+ 55.9  49.8  59.5  64.9  75.6  68.8  67.9  65.4  70.7  73.8  72.0  63.0
 ```
 
-**Verdict: partial pass.** Volume sits inside the ±25% Moriasi band (+15.7%). Seasonal
-**dynamics** clearly fail: SWAT+ swings only ~26 mm across the year against MODIS's ~81 mm,
+**Verdict: partial pass.** Volume sits inside the ±25% Moriasi band (+14.4%). Seasonal
+**dynamics** clearly fail: SWAT+ swings only ~26 mm across the year against MODIS's ~86 mm,
 so the seasonal amplitude is roughly **3× too flat** — too much dry-season ET, far too
 little at the wet-season peak. This is the single most defensible criticism of the model
 and should be stated before anyone else finds it.
 
-Reproduce: `python et_validation.py --reference mod16_et_ogun_monthly.csv` (MOD16) or
+### 11.1a AOI correction — sample the basin, not a bounding box
+
+The first MOD16 export used a **rectangle** around the catchment (lon 2.6–3.9, lat
+6.55–9.1). That rectangle is **40,397 km²** against the basin's **19,915 km²**, so roughly
+**half of every sampled pixel lay outside the watershed**, diluting the basin mean with land
+that does not drain to the outlet.
+
+Fixed by inlining the dissolved 71-subbasin outline into the GEE script (500 m
+simplification, 7,252 → 303 vertices, area error 0.033%) via `make_gee_aoi.py`. No GEE
+asset upload required.
+
+| | Rectangle AOI | Basin AOI | Δ |
+|---|---|---|---|
+| Annual MOD16 | 935 mm/yr | 920 mm/yr | −1.6% |
+| Monthly NSE | 0.09 | 0.14 | +0.05 |
+| PBIAS | +15.7% | +14.4% | −1.3 pp |
+
+> **The correction was necessary but changed no conclusion.** That is worth stating in the
+> defence: the ET finding survives a 2× change in sampling area, so it is a property of the
+> model, not an artefact of how the region was drawn. Both CSVs are kept
+> (`mod16_et_ogun_monthly.csv` = rectangle, `..._basin.csv` = basin) so the check is auditable.
+
+Reproduce: `python et_validation.py --reference mod16_et_ogun_monthly_basin.csv` (MOD16) or
 `python et_validation.py` (TerraClimate, bundled offline).
 
 ### 11.2 Multi-variable calibration probe (why parameters were NOT re-tuned)

@@ -12,7 +12,7 @@ found; do not round them up.
 
 | # | Test | Observation | Result | Verdict |
 |---|------|-------------|--------|---------|
-| 1 | SWAT+ evapotranspiration | **MODIS MOD16**, 155 months | NSE 0.09 · R² 0.35 · PBIAS +15.7% | **Partial** — volume good, dynamics fail |
+| 1 | SWAT+ evapotranspiration | **MODIS MOD16** (basin AOI), 155 months | NSE 0.14 · R² 0.36 · PBIAS +14.4% | **Partial** — volume good, dynamics fail |
 | 1b | same, second reference | TerraClimate AET, 155 months | NSE 0.18 · R² 0.39 · PBIAS +12.5% | **Agrees with MOD16** |
 | 2 | Discharge-vs-ET trade-off | both objectives scored together | incumbent is the only feasible set | **Parameters retained** |
 | 3 | Hazard map, pixel level | MODIS 2012 flood extent, 35.2 km² | AUC-ROC 0.62 · enrichment 1.37× | **Modest but real skill** |
@@ -23,15 +23,15 @@ found; do not round them up.
 ## The two things most likely to be challenged
 
 **1. The ET seasonality is badly off, and you should say so first.** Against MODIS, SWAT+
-swings only ~26 mm across the year where MODIS swings ~81 mm — the seasonal amplitude is
-about **3× too flat**. Annual volume is fine (+15.7%, inside the ±25% band), so the model
+swings only ~26 mm across the year where MODIS swings ~86 mm — the seasonal amplitude is
+about **3× too flat**. Annual volume is fine (+14.4%, inside the ±25% band), so the model
 moves roughly the right amount of water; it just spreads it too evenly through the year.
 
 Expect to be asked why. The honest answer is in §11.2 of the methodology log: `petco`, the
 PET multiplier, is pinned at its allowed ceiling of 1.20, and pushing past it improves ET
 but breaks the discharge thresholds. The two objectives genuinely conflict.
 
-**Both ET references agree**, which is the strongest part of this. MODIS (935 mm/yr,
+**Both ET references agree**, which is the strongest part of this. MODIS (920 mm/yr,
 satellite) and TerraClimate (900 mm/yr, water-balance model) were run independently and show
 the same damped cycle. A single reference could be wrong; two unrelated ones agreeing is
 much harder to dismiss.
@@ -56,15 +56,20 @@ structural blind spot in an AHP susceptibility approach and a strong "further wo
 | `spatial_validation.py` | Tests A + B. Self-contained; writes `spatial_validation_results.json`. |
 | `build_validation_bundle.py` | Merges all results into `models/core/validation_results.json` for the portal. |
 | `nema_2022_lagos.csv` | The 62 extracted Lagos NEMA records (state, LGA, community, date, affected). |
-| `../swat/validation/et_validation.py` | ET comparison against TerraClimate. |
+| `../swat/validation/et_validation.py` | ET comparison. Default = TerraClimate (offline); `--reference <csv>` = MOD16. |
 | `../swat/validation/calib_joint.py` | Scores a parameter set against discharge **and** ET at once. |
-| `../swat/validation/fetch_mod16_et_gee.js` | GEE script for the true MOD16 version. |
+| `../swat/validation/fetch_mod16_et_gee.js` | GEE script for MOD16. Basin outline is inlined — **do not hand-edit the coordinates**. |
+| `../swat/validation/make_gee_aoi.py` | Regenerates that script from the watershed shapefile. |
+| `../swat/validation/mod16_et_ogun_monthly*.csv` | MOD16 exports. `_basin` = correct AOI (use this); the other is the superseded bounding-box run, kept for audit. |
 
 Reproduce everything:
 
 ```bash
-python ../swat/validation/et_validation.py && python spatial_validation.py && python build_validation_bundle.py
+python ../swat/validation/et_validation.py --reference mod16_et_ogun_monthly_basin.csv && python ../swat/validation/et_validation.py && python spatial_validation.py && python build_validation_bundle.py
 ```
+
+> Order matters: the MOD16 run must come before `build_validation_bundle.py`, which picks
+> MOD16 as the primary reference and falls back to TerraClimate only if it is absent.
 
 ---
 
@@ -74,6 +79,8 @@ python ../swat/validation/et_validation.py && python spatial_validation.py && py
   (`Nigeria - Flood Extents Nov 2012`). 250 m.
 - **NEMA flood records** — 2022 NEMA Flood Data, via HDX (`Nigeria: Flood data`).
   62 Lagos community reports across 13 LGAs.
+- **MODIS ET** — MOD16A2GF v061, gap-filled 8-day ET, 500 m, via Google Earth Engine
+  (`MODIS/061/MOD16A2GF`). Sampled over the delineated Ogun basin outline (19,915 km²).
 - **TerraClimate** — Abatzoglou, J.T. et al. (2018) *Scientific Data* 5:170191. ~4 km monthly.
 - **GEOGLOWS** — ECMWF retrospective discharge, reach 140585128 (Ogun @ Kara).
 - **Method precedent** — Odusanya, A.E. et al. (2019), multi-variable SWAT calibration with

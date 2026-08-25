@@ -80,20 +80,30 @@ def main():
         "et_two_reference_note": (
             "Two unrelated ET products were tested: MODIS MOD16A2GF (satellite "
             "retrieval, primary) and TerraClimate (climatic water balance). They "
-            "agree with each other -- 935 vs 900 mm/yr, and both show the same "
+            "agree with each other -- 920 vs 900 mm/yr, and both show the same "
             "damped seasonal cycle in SWAT+. Agreement between two independent "
             "references makes the finding robust rather than an artefact of one "
             "product."
         ) if et_alt else None,
+        "et_aoi_correction_note": (
+            "MOD16 was first exported over a bounding box (40,397 km2) rather than "
+            "the delineated basin (19,915 km2), so about half the sampled pixels lay "
+            "outside the catchment. Re-exported over the true basin outline, the "
+            "annual mean moved only 935 -> 920 mm/yr and monthly NSE 0.09 -> 0.14. "
+            "The correction was methodologically necessary but changed no conclusion "
+            "-- which is itself evidence the ET finding is not an artefact of how the "
+            "sampling region was drawn."
+        ),
         "spatial_validation": sp,
         "multivariable_calibration_tradeoff": TRADEOFF,
         "honest_status": {
-            "et_independent_check": "PARTIAL - against MODIS MOD16, volume is within "
-                                    "15.7% (inside the +/-25% Moriasi band) but seasonal "
-                                    "dynamics are weak (monthly NSE 0.09). SWAT+ swings "
-                                    "~26 mm across the year against MODIS's ~81 mm, so the "
-                                    "seasonal amplitude is roughly 3x too flat. "
-                                    "TerraClimate independently shows the same pattern.",
+            "et_independent_check": "PARTIAL - against MODIS MOD16 sampled over the true "
+                                    "basin, volume is within 14.4% (inside the +/-25% "
+                                    "Moriasi band) but seasonal dynamics are weak (monthly "
+                                    "NSE 0.14). SWAT+ swings ~26 mm across the year against "
+                                    "MODIS's ~86 mm, so the seasonal amplitude is roughly 3x "
+                                    "too flat. TerraClimate independently shows the same "
+                                    "pattern.",
             "hazard_map_pixel_level": "MODEST SKILL - AUC-ROC 0.62 against the 2012 "
                                       "MODIS flood extent; zone enrichment rises "
                                       "monotonically to 1.61x in Very High.",

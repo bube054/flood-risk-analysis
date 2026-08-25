@@ -1,15 +1,15 @@
 {
-  "reference_product": "MODIS MOD16A2GF (satellite ET) - mod16_et_ogun_monthly.csv",
+  "reference_product": "MODIS MOD16A2GF (satellite ET) - mod16_et_ogun_monthly_basin.csv",
   "reference_is_not_mod16": false,
   "independence_note": "SWAT+ was calibrated on GEOGLOWS discharge only; no ET term entered the objective function. This is an independent multi-variable test.",
   "n_months": 155,
   "period": "2011-01 to 2023-11",
   "monthly": {
-    "nse": 0.09,
-    "r2": 0.349,
-    "pbias": 15.74,
-    "rmse_mm": 28.29,
-    "mean_ref_mm": 77.9,
+    "nse": 0.136,
+    "r2": 0.365,
+    "pbias": 14.39,
+    "rmse_mm": 29.22,
+    "mean_ref_mm": 76.6,
     "mean_sim_mm": 65.6
   },
   "months_covered": [
@@ -27,22 +27,22 @@
     12
   ],
   "climatology": {
-    "nse": 0.134,
-    "r2": 0.548,
-    "pbias": 15.54,
+    "nse": 0.179,
+    "r2": 0.572,
+    "pbias": 14.16,
     "ref_mm": [
-      32.5,
-      36.7,
-      56.7,
-      64.7,
-      85.9,
-      100.0,
-      110.1,
-      113.2,
-      113.9,
-      88.6,
-      84.0,
-      46.0
+      27.8,
+      32.1,
+      53.7,
+      65.0,
+      87.0,
+      101.7,
+      110.2,
+      112.3,
+      113.6,
+      88.5,
+      83.2,
+      41.9
     ],
     "sim_mm": [
       55.9,
@@ -60,7 +60,7 @@
     ]
   },
   "annual_mm": {
-    "reference": 935.0,
+    "reference": 920.0,
     "swat": 787.0
   }
 }
