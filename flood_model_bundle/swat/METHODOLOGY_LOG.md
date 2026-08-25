@@ -341,25 +341,42 @@ live in `swat/validation/` and `validation/`.
 
 ### 11.1 ET — a second variable the model was never tuned to
 
-Reference: **TerraClimate `aet`** (Abatzoglou et al. 2018), ~4 km monthly, basin-masked
-to the delineated watershed, 155 months (2011–2023). Retrieved via the THREDDS NCSS
-endpoint as per-year netCDF subsets (~56 KB each — disk-light). **NCSS returns raw Int16;
-`scale_factor = 0.1` must be applied manually.**
+**Two unrelated ET products were tested**, 155 months (2011–2023), basin-masked to the
+delineated watershed:
 
-> **This is NOT MODIS MOD16.** MOD16 needs an interactive GEE/Earthdata login, and the
-> no-login route (ORNL DAAC MODIS REST API) returned HTTP 500 on every endpoint. Say so
-> plainly — TerraClimate is a climatic water-balance product, not a satellite retrieval,
-> which is a weaker independence claim. `validation/fetch_mod16_et_gee.js` redoes this
-> with true satellite ET once you can log in.
+1. **MODIS MOD16A2GF** (primary) — true satellite retrieval, 500 m, 8-day composites
+   summed to monthly and scaled by 0.1. Exported from Google Earth Engine via
+   `validation/fetch_mod16_et_gee.js` (needs an interactive GEE login — run it yourself).
+   This is the product Odusanya et al. (2019) used and the one specified for this work.
+2. **TerraClimate `aet`** (corroborating) — ~4 km monthly climatic water balance, pulled
+   from the THREDDS NCSS endpoint as per-year netCDF subsets (~56 KB each — disk-light).
+   **NCSS returns raw Int16; `scale_factor = 0.1` must be applied manually.**
 
-| | NSE | R² | PBIAS |
-|---|---|---|---|
-| Monthly (155 mo) | 0.18 | 0.39 | +12.5% |
-| Monthly climatology | 0.29 | 0.76 | +12.3% |
+| Reference | Monthly NSE | R² | PBIAS | Annual mm/yr |
+|---|---|---|---|---|
+| **MOD16 (satellite)** | 0.09 | 0.35 | +15.7% | **935** |
+| TerraClimate | 0.18 | 0.39 | +12.5% | 900 |
+| — SWAT+ simulated — | | | | **787** |
 
-Annual: reference **900** vs SWAT **787 mm/yr**. Volume sits inside the ±25% Moriasi band;
-seasonal **dynamics** are weak — SWAT damps the swing (too much dry-season ET, too little
-at the peak). Honest verdict: **partial pass**.
+**The two references agree with each other** (935 vs 900 mm/yr) and tell the same story,
+which is what makes this robust rather than an artefact of one product.
+
+Monthly climatology vs MOD16 (mm):
+
+```
+       Jan   Feb   Mar   Apr   May   Jun   Jul   Aug   Sep   Oct   Nov   Dec
+MOD16 32.5  36.7  56.7  64.7  85.9 100.0 110.1 113.2 113.9  88.6  84.0  46.0
+SWAT+ 55.9  49.8  59.5  64.9  75.6  68.8  67.9  65.4  70.7  73.8  72.0  63.0
+```
+
+**Verdict: partial pass.** Volume sits inside the ±25% Moriasi band (+15.7%). Seasonal
+**dynamics** clearly fail: SWAT+ swings only ~26 mm across the year against MODIS's ~81 mm,
+so the seasonal amplitude is roughly **3× too flat** — too much dry-season ET, far too
+little at the wet-season peak. This is the single most defensible criticism of the model
+and should be stated before anyone else finds it.
+
+Reproduce: `python et_validation.py --reference mod16_et_ogun_monthly.csv` (MOD16) or
+`python et_validation.py` (TerraClimate, bundled offline).
 
 ### 11.2 Multi-variable calibration probe (why parameters were NOT re-tuned)
 

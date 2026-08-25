@@ -340,10 +340,19 @@ def validation_available():
 
 
 def et_validation():
-    """Independent ET check of the calibrated SWAT+ model. The model was fitted to
-    discharge only, so this is a genuine out-of-sample test on a second variable."""
+    """Independent ET check of the calibrated SWAT+ model, against MODIS MOD16A2GF.
+    The model was fitted to discharge only, so this is a genuine out-of-sample test
+    on a second variable."""
     v = _val()
     return v["et_validation"] if v else None
+
+
+def et_validation_corroborating():
+    """The same ET check against a second, unrelated reference (TerraClimate).
+    Returns None if only one reference was run. Two independent products agreeing
+    is what makes the ET finding robust."""
+    v = _val()
+    return v.get("et_validation_corroborating") if v else None
 
 
 def spatial_validation():

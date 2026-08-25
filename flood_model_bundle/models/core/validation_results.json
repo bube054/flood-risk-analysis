@@ -1,6 +1,72 @@
 {
   "summary": "Two independent validations added after the discharge calibration: (1) an ET check the model was never tuned to, and (2) a spatial check of the AHP hazard map against observed floods. Neither is a pass/fail certificate -- read the caveats on each.",
   "et_validation": {
+    "reference_product": "MODIS MOD16A2GF (satellite ET) - mod16_et_ogun_monthly.csv",
+    "reference_is_not_mod16": false,
+    "independence_note": "SWAT+ was calibrated on GEOGLOWS discharge only; no ET term entered the objective function. This is an independent multi-variable test.",
+    "n_months": 155,
+    "period": "2011-01 to 2023-11",
+    "monthly": {
+      "nse": 0.09,
+      "r2": 0.349,
+      "pbias": 15.74,
+      "rmse_mm": 28.29,
+      "mean_ref_mm": 77.9,
+      "mean_sim_mm": 65.6
+    },
+    "months_covered": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12
+    ],
+    "climatology": {
+      "nse": 0.134,
+      "r2": 0.548,
+      "pbias": 15.54,
+      "ref_mm": [
+        32.5,
+        36.7,
+        56.7,
+        64.7,
+        85.9,
+        100.0,
+        110.1,
+        113.2,
+        113.9,
+        88.6,
+        84.0,
+        46.0
+      ],
+      "sim_mm": [
+        55.9,
+        49.8,
+        59.5,
+        64.9,
+        75.6,
+        68.8,
+        67.9,
+        65.4,
+        70.7,
+        73.8,
+        72.0,
+        63.0
+      ]
+    },
+    "annual_mm": {
+      "reference": 935.0,
+      "swat": 787.0
+    }
+  },
+  "et_validation_corroborating": {
     "reference_product": "TerraClimate aet v1 (Abatzoglou et al. 2018), ~4km monthly",
     "reference_is_not_mod16": true,
     "independence_note": "SWAT+ was calibrated on GEOGLOWS discharge only; no ET term entered the objective function. This is an independent multi-variable test.",
@@ -14,6 +80,20 @@
       "mean_ref_mm": 75.0,
       "mean_sim_mm": 65.6
     },
+    "months_covered": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12
+    ],
     "climatology": {
       "nse": 0.289,
       "r2": 0.756,
@@ -52,6 +132,7 @@
       "swat": 787.0
     }
   },
+  "et_two_reference_note": "Two unrelated ET products were tested: MODIS MOD16A2GF (satellite retrieval, primary) and TerraClimate (climatic water balance). They agree with each other -- 935 vs 900 mm/yr, and both show the same damped seasonal cycle in SWAT+. Agreement between two independent references makes the finding robust rather than an artefact of one product.",
   "spatial_validation": {
     "test_a_pixel_level": {
       "observation": "MODIS 250m flood extent, Nigeria Jul-Nov 2012 (NASA/DFO via HDX)",
@@ -306,7 +387,7 @@
     "diagnosis": "petco (PET multiplier) is pinned at its allowed maximum of 1.20 in the calibrated set. Independently, TerraClimate indicates SWAT+ ET is ~12.5% too low. Two separate lines of evidence therefore agree that the model wants more evapotranspiration than the parameter range permits."
   },
   "honest_status": {
-    "et_independent_check": "PARTIAL - volume within 12.5% (inside the +/-25% Moriasi band), but seasonal dynamics weak (monthly NSE 0.18).",
+    "et_independent_check": "PARTIAL - against MODIS MOD16, volume is within 15.7% (inside the +/-25% Moriasi band) but seasonal dynamics are weak (monthly NSE 0.09). SWAT+ swings ~26 mm across the year against MODIS's ~81 mm, so the seasonal amplitude is roughly 3x too flat. TerraClimate independently shows the same pattern.",
     "hazard_map_pixel_level": "MODEST SKILL - AUC-ROC 0.62 against the 2012 MODIS flood extent; zone enrichment rises monotonically to 1.61x in Very High.",
     "hazard_map_lga_level": "INCONCLUSIVE - NEMA report counts track raw population (rho 0.57) far better than modelled exposure (rho 0.17), so the test is confounded by reporting effort and cannot validate the map.",
     "not_claimed": "None of this establishes forecast skill. The map remains an AHP susceptibility index, now with a measured and modest correspondence to one observed flood event."

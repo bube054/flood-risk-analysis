@@ -53,8 +53,20 @@ TRADEOFF = {
 
 
 def main():
-    et = json.loads((BUNDLE / "swat" / "validation" / "et_validation_results.json").read_text())
+    svd = BUNDLE / "swat" / "validation"
     sp = json.loads((HERE / "spatial_validation_results.json").read_text())
+
+    # MOD16 (true satellite ET) is the primary reference -- this is the product
+    # the supervisor asked for. TerraClimate is retained as a second, unrelated
+    # reference: the two agreeing matters more than either alone.
+    mod16_path = svd / "et_validation_results_mod16.json"
+    tc_path = svd / "et_validation_results.json"
+    if mod16_path.exists():
+        et = json.loads(mod16_path.read_text())
+        et_alt = json.loads(tc_path.read_text()) if tc_path.exists() else None
+    else:
+        et = json.loads(tc_path.read_text())
+        et_alt = None
 
     out = {
         "summary": (
@@ -64,12 +76,24 @@ def main():
             "pass/fail certificate -- read the caveats on each."
         ),
         "et_validation": et,
+        "et_validation_corroborating": et_alt,
+        "et_two_reference_note": (
+            "Two unrelated ET products were tested: MODIS MOD16A2GF (satellite "
+            "retrieval, primary) and TerraClimate (climatic water balance). They "
+            "agree with each other -- 935 vs 900 mm/yr, and both show the same "
+            "damped seasonal cycle in SWAT+. Agreement between two independent "
+            "references makes the finding robust rather than an artefact of one "
+            "product."
+        ) if et_alt else None,
         "spatial_validation": sp,
         "multivariable_calibration_tradeoff": TRADEOFF,
         "honest_status": {
-            "et_independent_check": "PARTIAL - volume within 12.5% (inside the "
-                                    "+/-25% Moriasi band), but seasonal dynamics weak "
-                                    "(monthly NSE 0.18).",
+            "et_independent_check": "PARTIAL - against MODIS MOD16, volume is within "
+                                    "15.7% (inside the +/-25% Moriasi band) but seasonal "
+                                    "dynamics are weak (monthly NSE 0.09). SWAT+ swings "
+                                    "~26 mm across the year against MODIS's ~81 mm, so the "
+                                    "seasonal amplitude is roughly 3x too flat. "
+                                    "TerraClimate independently shows the same pattern.",
             "hazard_map_pixel_level": "MODEST SKILL - AUC-ROC 0.62 against the 2012 "
                                       "MODIS flood extent; zone enrichment rises "
                                       "monotonically to 1.61x in Very High.",

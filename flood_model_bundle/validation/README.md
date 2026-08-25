@@ -12,7 +12,8 @@ found; do not round them up.
 
 | # | Test | Observation | Result | Verdict |
 |---|------|-------------|--------|---------|
-| 1 | SWAT+ evapotranspiration | TerraClimate AET, 155 months | NSE 0.18 · R² 0.39 · PBIAS +12.5% | **Partial** — volume good, dynamics weak |
+| 1 | SWAT+ evapotranspiration | **MODIS MOD16**, 155 months | NSE 0.09 · R² 0.35 · PBIAS +15.7% | **Partial** — volume good, dynamics fail |
+| 1b | same, second reference | TerraClimate AET, 155 months | NSE 0.18 · R² 0.39 · PBIAS +12.5% | **Agrees with MOD16** |
 | 2 | Discharge-vs-ET trade-off | both objectives scored together | incumbent is the only feasible set | **Parameters retained** |
 | 3 | Hazard map, pixel level | MODIS 2012 flood extent, 35.2 km² | AUC-ROC 0.62 · enrichment 1.37× | **Modest but real skill** |
 | 4 | Hazard map, LGA level | NEMA 2022, 62 Lagos reports | ρ = −0.45 vs exposure, **+0.57 vs population** | **Inconclusive / null** |
@@ -21,16 +22,19 @@ found; do not round them up.
 
 ## The two things most likely to be challenged
 
-**1. The ET reference is not MODIS.** Your proposal to Dr. Echeta specified MOD16. MOD16 is
-reachable only through Google Earth Engine or NASA Earthdata, both of which need an
-interactive login; the no-login route (ORNL DAAC MODIS REST API) was returning HTTP 500 on
-every endpoint. TerraClimate was used instead — a climatic **water-balance model**, not a
-satellite retrieval, which is a genuinely weaker independence claim.
+**1. The ET seasonality is badly off, and you should say so first.** Against MODIS, SWAT+
+swings only ~26 mm across the year where MODIS swings ~81 mm — the seasonal amplitude is
+about **3× too flat**. Annual volume is fine (+15.7%, inside the ±25% band), so the model
+moves roughly the right amount of water; it just spreads it too evenly through the year.
 
-Run [`../swat/validation/fetch_mod16_et_gee.js`](../swat/validation/fetch_mod16_et_gee.js)
-in the GEE Code Editor to redo this with true MODIS ET. That upgrades the claim from
-"independent gridded reference" to "independent satellite observation" — worth doing before
-the defence.
+Expect to be asked why. The honest answer is in §11.2 of the methodology log: `petco`, the
+PET multiplier, is pinned at its allowed ceiling of 1.20, and pushing past it improves ET
+but breaks the discharge thresholds. The two objectives genuinely conflict.
+
+**Both ET references agree**, which is the strongest part of this. MODIS (935 mm/yr,
+satellite) and TerraClimate (900 mm/yr, water-balance model) were run independently and show
+the same damped cycle. A single reference could be wrong; two unrelated ones agreeing is
+much harder to dismiss.
 
 **2. Test B is confounded, and saying so is the correct move.** NEMA report counts correlate
 with raw population (ρ = +0.57) far better than with modelled exposure (ρ = +0.17). The

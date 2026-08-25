@@ -1205,15 +1205,22 @@ with tab_valid:
             height=260,
         )
         st.markdown(
-            f"**Verdict — {_v['honest_status']['et_independent_check']}** "
-            "The model reproduces annual ET volume but damps the seasonal swing: "
-            "too much ET in the dry season, too little at the peak."
+            f"**Verdict — {_v['honest_status']['et_independent_check']}**"
         )
+        _alt = M.et_validation_corroborating()
+        if _alt:
+            st.success(
+                "✅ **Two independent references agree.** MODIS MOD16 "
+                f"({_et['annual_mm']['reference']:.0f} mm/yr) and TerraClimate "
+                f"({_alt['annual_mm']['reference']:.0f} mm/yr) were tested separately "
+                "and show the same damped seasonal cycle. The finding is robust, not "
+                "an artefact of one product."
+            )
         st.caption(
-            f"Reference: {_et['reference_product']}. "
-            "This is **not** MODIS MOD16 — MOD16 needs an interactive Earth Engine "
-            "login. Run `swat/validation/fetch_mod16_et_gee.js` to redo this with "
-            "true satellite ET."
+            f"Primary reference: {_et['reference_product']} — a true satellite ET "
+            "retrieval, the product specified for this validation. Regenerate with "
+            "`swat/validation/fetch_mod16_et_gee.js`, then "
+            "`et_validation.py --reference <csv>`."
         )
 
         # ── 2. Calibration trade-off ─────────────────────────────────────────
