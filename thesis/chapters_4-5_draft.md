@@ -260,12 +260,15 @@ Table 4.16 Susceptibility zone areas and resident population, Lagos State
 | Zone | Area (km²) | % of Lagos | Population | % of population |
 |---|---|---|---|---|
 | Very Low | 0.8 | 0.02 | 10,077 | 0.08 |
-| Low | 169.5 | 4.46 | 692,475 | 5.58 |
-| Moderate | 2,309.9 | 46.61 | 6,908,435 | 55.62 |
-| High | 3,381.0 | 27.92 | 4,368,569 | 35.17 |
-| Very High | 799.0 | 20.99 | 441,500 | 3.55 |
+| Low | 168.7 | 4.46 | 692,475 | 5.58 |
+| Moderate | 1,762.9 | 46.61 | 6,908,435 | 55.62 |
+| High | 1,055.9 | 27.92 | 4,368,569 | 35.17 |
+| Very High | 793.7 | 20.99 | 441,500 | 3.55 |
+| **Total** | **3,781.9** | **100.00** | **12,421,056** | **100.00** |
 
-The results in Table 4.16 above show that 4,810,069 residents, representing 38.7% of the state population, fall within the High or Very High susceptibility zones. The High and Very High zones together cover 48.91% of the state area.
+Areas in Table 4.16 are computed over the twenty Local Government Area boundaries of Lagos State, and the column total of 3,781.9 km² corresponds to the area of the LGA boundary polygon. Zone areas computed over the full raster extent are larger, since the hazard grid extends beyond the state boundary across the lagoon and into adjoining territory; those figures do not describe Lagos State and are not reported here.
+
+The results in Table 4.16 above show that 4,810,069 residents, representing 38.7% of the state population, fall within the High or Very High susceptibility zones. The High and Very High zones together cover 1,849.6 km², or 48.91% of the state area.
 
 Table 4.17 Highest and lowest LGA exposure
 
