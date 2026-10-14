@@ -549,7 +549,7 @@ with tab_overview:
                         text-transform:uppercase; letter-spacing:0.06em;
                         margin-bottom:0.6rem;">🔍 Problem Statement</div>
             <p style="color:#cbd5e1; font-size:0.85rem; line-height:1.65;">
-                Lagos State, with over <strong>21 million residents</strong> in a low-lying
+                Lagos State, with over <strong>20 million residents</strong> in a low-lying
                 coastal setting, faces recurring and devastating flooding. Rapid urbanization,
                 inadequate drainage infrastructure, and increasingly variable rainfall
                 amplify the risk. This project develops a <em>spatial decision-support
@@ -580,7 +580,16 @@ with tab_overview:
         """, unsafe_allow_html=True)
 
     with c3:
-        st.markdown("""
+        # Derived from real_baseline_exposure() rather than hardcoded, so this card
+        # cannot drift from the Exposure tab or from the thesis. The denominator is
+        # the WorldPop total inside the LGA boundaries (12.42 M), NOT a metro-wide
+        # population estimate — mixing the two previously produced 22.8% here
+        # against 38.7% in the Exposure tab and in the report.
+        _b = get_baseline()
+        _hv_m = _b["High+VeryHigh"] / 1e6
+        _hv_pct = 100 * _b["High+VeryHigh"] / _b["total"]
+        _tot_m = _b["total"] / 1e6
+        st.markdown(f"""
         <div style="background:linear-gradient(145deg,rgba(15,23,42,0.8),rgba(30,41,59,0.6));
                     border:1px solid rgba(100,116,139,0.15); border-radius:14px;
                     padding:1.2rem 1.4rem; height:100%;">
@@ -588,8 +597,9 @@ with tab_overview:
                         text-transform:uppercase; letter-spacing:0.06em;
                         margin-bottom:0.6rem;">📊 Key Findings</div>
             <p style="color:#cbd5e1; font-size:0.85rem; line-height:1.65;">
-                <strong>~4.81 million people</strong> reside in High or Very High hazard
-                zones — approximately <strong>22.8%</strong> of Lagos State's population.<br><br>
+                <strong>~{_hv_m:.2f} million people</strong> reside in High or Very High hazard
+                zones — <strong>{_hv_pct:.1f}%</strong> of the {_tot_m:.2f} million residents
+                captured in the WorldPop analysis grid.<br><br>
                 Flood hazard is <strong>topography-dominated</strong>: elevation + TWI account
                 for 38% of the index weight. Rainfall factors contribute 20%, meaning rainfall
                 scenario effects are intentionally modest — the map is structurally realistic.<br><br>
@@ -1155,8 +1165,11 @@ with tab_hydro:
         cal = M.swat_calibration()
         st.markdown("### ✅ Calibration performance")
         c1, c2, c3 = st.columns(3)
-        c1.metric("NSE", f"{cal['nse']:.2f}", "target ≥ 0.50")
-        c2.metric("R²", f"{cal['r2']:.2f}", "target ≥ 0.60")
+        # Three decimals, not two: NSE clears its threshold by 0.007 and R² by
+        # 0.006. Rounding to 0.51 / 0.61 hides how narrow that is, and the report
+        # states the margins explicitly.
+        c1.metric("NSE", f"{cal['nse']:.3f}", "target ≥ 0.50")
+        c2.metric("R²", f"{cal['r2']:.3f}", "target ≥ 0.60")
         c3.metric("PBIAS", f"{cal['pbias']:+.1f}%", "target ±25%")
         st.caption(
             f"Monthly discharge vs GEOGLOWS at the Ogun outlet ({cal['period']}). "
