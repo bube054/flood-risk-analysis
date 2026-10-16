@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "flood-portal",
+      "runtimeExecutable": "C:\\Users\\bube\\Documents\\projects\\old_projects\\flood-risk-portal\\flood_model_bundle\\.venv\\Scripts\\python.exe",
+      "runtimeArgs": ["-m", "streamlit", "run", "C:\\Users\\bube\\Documents\\projects\\old_projects\\flood-risk-portal\\flood_model_bundle\\app.py", "--server.port", "8501", "--server.headless", "true"],
+      "port": 8501
+    }
+  ]
+}

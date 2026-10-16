@@ -21,6 +21,8 @@ from matplotlib.colors import ListedColormap, BoundaryNorm
 import numpy as np
 import pandas as pd
 import rasterio
+from rasterio.features import geometry_mask
+from rasterio.transform import Affine
 from rasterio.warp import transform_bounds
 from PIL import Image
 import streamlit as st
@@ -218,11 +220,17 @@ def _fmt(val, unit="", decimals=1):
 
 @st.cache_data(ttl=3600)
 def get_hazard_overlay():
-    """Read hazard zones TIF, colorize, and return base64 PNG + WGS84 bounds."""
+    """Read hazard zones TIF, clip to the 20 LGAs, colorize, and return base64 PNG + WGS84 bounds."""
     with rasterio.open(M._core("flood_hazard_zones.tif")) as ds:
         bounds = transform_bounds(ds.crs, "EPSG:4326", *ds.bounds)
         factor = 2
-        zones = ds.read(1, out_shape=(ds.height // factor, ds.width // factor))
+        out_shape = (ds.height // factor, ds.width // factor)
+        zones = ds.read(1, out_shape=out_shape)
+        # The raster has values across its whole bounding box (sea, Ogun State, Benin).
+        # Exposure statistics count only cells inside the LGA polygons, so show the same footprint.
+        transform = ds.transform * Affine.scale(ds.width / out_shape[1], ds.height / out_shape[0])
+        lgas = M.lga_boundaries().to_crs(ds.crs)
+        zones[geometry_mask(lgas.geometry, out_shape=out_shape, transform=transform)] = 0
 
     h, w = zones.shape
     rgba = np.zeros((h, w, 4), dtype=np.uint8)
@@ -679,9 +687,16 @@ with tab_map:
         m = folium.Map(
             location=[center_lat, center_lon],
             zoom_start=10,
-            tiles="CartoDB dark_matter",
+            tiles=None,
             control_scale=True,
         )
+        # CARTO's free basemaps now return an "API KEY REQUIRED" tile; Esri's dark canvas needs no key.
+        folium.TileLayer(
+            "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+            attr="Tiles &copy; Esri &mdash; Esri, HERE, Garmin, &copy; OpenStreetMap contributors",
+            name="Dark basemap (Esri)",
+            max_zoom=16,
+        ).add_to(m)
 
         folium.raster_layers.ImageOverlay(
             image=f"data:image/png;base64,{b64_img}",
@@ -751,7 +766,7 @@ with tab_map:
             <div style="color:#94a3b8; font-size:0.75rem; line-height:1.6;">
                 CRS: EPSG:32631 (UTM 31N)<br>
                 Classification: Equal Interval<br>
-                Basemap: CartoDB Dark Matter<br>
+                Basemap: Esri Dark Gray Canvas<br>
                 LGA Boundaries: GADM
             </div>
         </div>
