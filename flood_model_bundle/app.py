@@ -1,23 +1,27 @@
 """
 app.py — Lagos Flood Hazard & Exposure Explorer
 =================================================
-Premium interactive dashboard integrating AHP flood hazard models,
-population exposure analytics, and NIMET climate scenarios for
-Lagos State, Nigeria.
+Interactive explorer over the AHP flood hazard model, population exposure,
+NIMET climate analysis and the SWAT+ Ogun model for Lagos State, Nigeria.
+
+Light and dark themes are defined in .streamlit/config.toml; viewers switch
+between them from the top-right menu. Custom HTML below takes its
+colours from CSS light-dark() tokens, so it follows the switch without a rerun.
 
 Run:  streamlit run app.py
 """
 import base64
 import calendar
 import io
-import math
+import itertools
+import json
 import os
 
+import altair as alt
 import folium
 import folium.raster_layers
-import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
-from matplotlib.colors import ListedColormap, BoundaryNorm
+from branca.element import MacroElement
+from folium.template import Template
 import numpy as np
 import pandas as pd
 import rasterio
@@ -35,145 +39,251 @@ import model_api as M
 # ═══════════════════════════════════════════════════════════════════════════════
 st.set_page_config(
     page_title="Lagos Flood Hazard Explorer",
-    page_icon="🌊",
+    page_icon=":material/flood:",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",   # open on desktop, collapsed on phones
 )
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# CUSTOM CSS — premium dark theme
+# STYLES
 # ═══════════════════════════════════════════════════════════════════════════════
+# Streamlit sets `color-scheme` on .stApp from the active theme, so light-dark()
+# resolves to the right side for everything inside it.
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-
-*, html, body, [class*="css"] {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+.stApp {
+    --fx-bg: light-dark(#f6f5f1, #141618);
+    --fx-ink: light-dark(#1c1f23, #e3e1db);
+    --fx-muted: light-dark(#5a6067, #a0a5ab);
+    --fx-rule: light-dark(#d5d1c7, #34383c);
+    --fx-panel: light-dark(#ebe8e1, #1f2225);
+    --fx-accent: light-dark(#1d5689, #86b6e0);
+    --fx-caution: light-dark(#9a6200, #e0b35a);
+    --fx-negative: light-dark(#a3322a, #e88a80);
+    --fx-positive: light-dark(#3f7a3b, #8fc489);
+    --fx-serif: "Source Serif 4", Georgia, "Times New Roman", serif;
 }
 
-/* Streamlit draws its icons as Material Symbols ligatures. The universal
-   rule above would override the icon font too, and a ligature rendered in
-   Inter shows its literal name — expanders printed "keyboard_arrow_right"
-   on top of their labels. Exempt icon elements from the override. */
-[data-testid="stIconMaterial"],
-span[class*="material-symbols"],
-.material-symbols-rounded {
-    font-family: 'Material Symbols Rounded' !important;
-    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+/* The header floats over the scrolling page, so it needs the page colour or
+   content shows through behind the sidebar toggle and the menu. */
+header[data-testid="stHeader"] { background: var(--fx-bg); }
+.block-container, [data-testid="stMainBlockContainer"] {
+    padding-top: 2.4rem;
+    padding-bottom: 3rem;
+    max-width: 1320px;
 }
 
-/* Hide default branding */
-#MainMenu, footer, header {visibility: hidden;}
-
-.main .block-container {
-    padding-top: 1.2rem;
-    padding-bottom: 1rem;
-    max-width: 1500px;
-}
-
-/* ── Sidebar ── */
-section[data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #0c1222 0%, #162032 100%);
-    border-right: 1px solid rgba(100,116,139,0.15);
-}
-
-/* ── Metric Cards ── */
-div[data-testid="stMetric"] {
-    background: linear-gradient(145deg, rgba(15,23,42,0.85), rgba(30,41,59,0.7));
-    border: 1px solid rgba(100,116,139,0.18);
-    border-radius: 14px;
-    padding: 1rem 1.2rem;
-    backdrop-filter: blur(12px);
-    box-shadow: 0 4px 20px rgba(0,0,0,0.25);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-div[data-testid="stMetric"]:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 28px rgba(0,0,0,0.35);
-}
-div[data-testid="stMetric"] label {
-    color: #94a3b8 !important;
-    font-weight: 600 !important;
-    font-size: 0.78rem !important;
+/* ── Type ── */
+.fx-overline, .fx-label {
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    font-weight: 600;
+    color: var(--fx-muted);
 }
-div[data-testid="stMetric"] [data-testid="stMetricValue"] {
-    color: #f1f5f9 !important;
-    font-weight: 700 !important;
+.fx-label { margin-bottom: 0.5rem; }
+.stApp .fx-title {
+    font-family: var(--fx-serif);
+    font-size: 2.35rem;
+    font-weight: 600;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    color: var(--fx-ink);
+    margin: 0.35rem 0 0.35rem;
 }
-div[data-testid="stMetric"] [data-testid="stMetricDelta"] {
-    font-weight: 600 !important;
+.fx-sub { color: var(--fx-muted); font-size: 1rem; margin: 0; max-width: 62rem; }
+.fx-masthead { padding-bottom: 1.1rem; border-bottom: 1px solid var(--fx-rule); }
+.fx-disclaimer {
+    margin-top: 0.95rem;
+    padding: 0.1rem 0 0.1rem 0.75rem;
+    border-left: 3px solid var(--fx-caution);
+    color: var(--fx-muted);
+    font-size: 0.87rem;
 }
+.fx-disclaimer strong { color: var(--fx-ink); font-weight: 600; }
+
+.fx-section { margin: 1.1rem 0 1.1rem; }
+.stApp .fx-h2 {
+    font-family: var(--fx-serif);
+    font-size: 1.65rem;
+    font-weight: 600;
+    line-height: 1.25;
+    color: var(--fx-ink);
+    margin: 0 0 0.3rem;
+}
+.fx-lede { color: var(--fx-muted); font-size: 0.95rem; line-height: 1.55; margin: 0; max-width: 56rem; }
+.stApp .fx-h3 {
+    font-family: var(--fx-serif);
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--fx-ink);
+    margin: 1.6rem 0 0.4rem;
+    padding-top: 1.2rem;
+    border-top: 1px solid var(--fx-rule);
+}
+.fx-readout { color: var(--fx-muted); font-size: 0.9rem; margin: -0.2rem 0 0.6rem; }
+.fx-readout strong { color: var(--fx-ink); font-weight: 600; font-variant-numeric: tabular-nums; }
 
 /* ── Tabs ── */
-.stTabs [data-baseweb="tab-list"] {
-    gap: 2px;
-    background: rgba(15,23,42,0.5);
-    border-radius: 14px;
-    padding: 5px;
-    border: 1px solid rgba(100,116,139,0.12);
+.stTabs [data-baseweb="tab-list"] { gap: 1.75rem; }
+.stTabs [data-baseweb="tab"] { padding: 0.75rem 0 0.65rem; }
+.stTabs [data-baseweb="tab"] p { font-size: 0.95rem; font-weight: 500; color: var(--fx-muted); }
+.stTabs [aria-selected="true"] p { color: var(--fx-ink); }
+
+/* Phones and small tablets: pin the tab bar under the header so sections stay
+   one tap away on long pages, and tighten it so more labels fit. The sticky
+   element is the tab list's wrapper (the list alone sits in a box its own
+   height, so it has nowhere to stick). 3.75rem is Streamlit's header height. */
+@media (max-width: 768px) {
+    .stTabs div:has(> [data-baseweb="tab-list"]) {
+        position: sticky;
+        top: 3.75rem;
+        z-index: 1000;
+        background: var(--fx-bg);
+        box-shadow: 0 1px 0 var(--fx-rule),
+                    0 10px 12px -10px light-dark(rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.7));
+    }
+    .stTabs [data-baseweb="tab-list"] { gap: 1.15rem; }
+    .stTabs [data-baseweb="tab"] p { font-size: 0.9rem; }
 }
-.stTabs [data-baseweb="tab"] {
-    border-radius: 10px;
-    color: #94a3b8;
+
+/* ── Metrics: a hairline above, no card ── */
+div[data-testid="stMetric"] { border-top: 1px solid var(--fx-rule); padding-top: 0.65rem; }
+/* Not uppercased: labels carry symbols like ρ that turn into look-alikes (Ρ = "P"). */
+[data-testid="stMetricLabel"] p {
+    font-size: 0.82rem;
     font-weight: 500;
-    padding: 10px 18px;
-    font-size: 0.9rem;
+    color: var(--fx-muted);
 }
-.stTabs [aria-selected="true"] {
-    background: linear-gradient(135deg, #0891b2, #7c3aed) !important;
-    color: #ffffff !important;
-    font-weight: 700;
-    box-shadow: 0 3px 12px rgba(8,145,178,0.3);
+[data-testid="stMetricValue"] {
+    font-size: 1.6rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
 }
 
-/* ── Buttons ── */
-.stButton > button {
-    background: linear-gradient(135deg, #0891b2 0%, #6366f1 100%) !important;
-    color: #ffffff !important;
-    border: none !important;
-    border-radius: 10px;
-    font-weight: 600;
-    padding: 0.55rem 1.6rem;
-    transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
-    box-shadow: 0 2px 10px rgba(6,182,212,0.2);
-    letter-spacing: 0.02em;
-}
-.stButton > button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 24px rgba(6,182,212,0.35);
-}
+/* ── Primary buttons: keep label contrast on the light dark-mode accent ── */
+.stButton button[kind="primary"] { color: light-dark(#ffffff, #101418); }
 
-.stDownloadButton > button {
-    background: linear-gradient(135deg, #7c3aed 0%, #db2777 100%) !important;
-    color: #ffffff !important;
-    border: none !important;
-    border-radius: 10px;
-    font-weight: 600;
-    box-shadow: 0 2px 10px rgba(124,58,237,0.2);
+/* ── Callouts: st.container(key="fx-callout-<tone>-n") ── */
+[class*="st-key-fx-callout-"] {
+    border-left: 3px solid var(--fx-accent);
+    background: var(--fx-panel);
+    border-radius: 0 4px 4px 0;
+    padding: 0.7rem 1rem;
+    gap: 0.3rem;
 }
-.stDownloadButton > button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 24px rgba(124,58,237,0.35);
-}
+[class*="st-key-fx-callout-caution"] { border-left-color: var(--fx-caution); }
+[class*="st-key-fx-callout-negative"] { border-left-color: var(--fx-negative); }
+[class*="st-key-fx-callout-positive"] { border-left-color: var(--fx-positive); }
+[class*="st-key-fx-callout-"] p { margin: 0; font-size: 0.92rem; line-height: 1.55; }
 
-/* ── DataFrames ── */
-[data-testid="stDataFrame"] {
-    border: 1px solid rgba(100,116,139,0.15);
-    border-radius: 10px;
+/* ── Chart value labels: Vega hard-codes fill="black" on text marks (axis text is
+      themed). The charts are SVG, so CSS can repaint them in the theme ink. ── */
+[data-testid="stVegaLiteChart"] g.mark-text.role-mark text { fill: var(--fx-ink); }
+
+/* ── Map frame and figure plates ── */
+.st-key-fx-map iframe { border: 1px solid var(--fx-rule); border-radius: 4px; }
+[data-testid="stImage"] img { border: 1px solid var(--fx-rule); border-radius: 4px; }
+
+/* ── Overview: headline figures. Cells carry their own top/left rules and the
+      wrapper clips the outer ones, so the strip wraps cleanly at any width. ── */
+.fx-figwrap {
     overflow: hidden;
+    border-top: 1px solid var(--fx-rule);
+    border-bottom: 1px solid var(--fx-rule);
+    margin: 0.2rem 0 1.8rem;
 }
+.fx-figures {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    margin: -1px 0 0 calc(-1.2rem - 1px);
+}
+.fx-fig { padding: 1.05rem 1.2rem; border-top: 1px solid var(--fx-rule); border-left: 1px solid var(--fx-rule); }
+.fx-fig-n {
+    font-family: var(--fx-serif);
+    font-size: 2rem;
+    font-weight: 600;
+    line-height: 1.1;
+    white-space: nowrap;
+    color: var(--fx-ink);
+    font-variant-numeric: lining-nums tabular-nums;
+}
+.fx-fig-l { color: var(--fx-muted); font-size: 0.85rem; line-height: 1.4; margin-top: 0.35rem; }
+.fx-prose { color: var(--fx-ink); font-size: 0.93rem; line-height: 1.65; }
+.fx-prose p { margin: 0 0 0.8rem; }
 
-/* ── Slider ── */
-.stSlider > div > div > div > div {
-    background: linear-gradient(90deg, #0891b2, #6366f1) !important;
+/* ── Definition lists, legends, weight bars ── */
+.fx-dl {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 0.35rem 0.9rem;
+    margin: 0 0 1.3rem;
+    font-size: 0.85rem;
+    line-height: 1.45;
 }
+.fx-dl dt { color: var(--fx-muted); }
+.fx-dl dd { margin: 0; color: var(--fx-ink); }
+.fx-side-title {
+    font-family: var(--fx-serif);
+    font-size: 1.08rem;
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--fx-ink);
+    margin-bottom: 1rem;
+}
+.fx-list { margin: 0 0 1.3rem; padding-left: 1.05rem; font-size: 0.85rem; line-height: 1.6; color: var(--fx-ink); }
+.stApp table.fx-weights { width: 100%; border-collapse: collapse; font-size: 0.82rem; border: none; }
+.stApp table.fx-weights td { padding: 0.2rem 0; border: none; background: none; }
+.stApp .fx-weights td.n { color: var(--fx-ink); white-space: nowrap; padding-right: 0.7rem; }
+.fx-weights td.b { width: 100%; }
+.fx-weights .bar { height: 6px; background: var(--fx-accent); border-radius: 1px; }
+.stApp .fx-weights td.v { text-align: right; padding-left: 0.6rem; color: var(--fx-muted); font-variant-numeric: tabular-nums; }
+.stApp .fx-weights tr.total td { border-top: 1px solid var(--fx-rule); padding-top: 0.4rem; font-weight: 600; color: var(--fx-ink); }
 
-/* ── Dividers ── */
-hr {
-    border-color: rgba(100,116,139,0.15) !important;
+.fx-legend-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.45rem 0;
+    border-bottom: 1px solid var(--fx-rule);
+    font-size: 0.88rem;
+    color: var(--fx-ink);
 }
+.fx-legend-row:first-of-type { border-top: 1px solid var(--fx-rule); }
+.fx-sw { width: 14px; height: 14px; border-radius: 2px; flex: none; }
+.fx-legend-range { margin-left: auto; color: var(--fx-muted); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+.fx-chips { display: flex; flex-wrap: wrap; gap: 0.4rem 1.1rem; font-size: 0.82rem; color: var(--fx-muted); margin: 0.5rem 0 1.2rem; }
+.fx-chips span { display: inline-flex; align-items: center; gap: 0.4rem; }
+.fx-chips i { width: 11px; height: 11px; border-radius: 2px; display: inline-block; }
+
+/* ── Point-query result ── */
+.fx-result {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 0;
+    margin: 0.8rem 0 1rem;
+    border-top: 1px solid var(--fx-rule);
+    border-bottom: 1px solid var(--fx-rule);
+}
+.fx-result-chip {
+    width: 52px;
+    height: 52px;
+    flex: none;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--fx-serif);
+    font-size: 1.4rem;
+    font-weight: 600;
+}
+.fx-result-title { font-family: var(--fx-serif); font-size: 1.4rem; font-weight: 600; color: var(--fx-ink); line-height: 1.2; }
+.fx-result-meta { color: var(--fx-muted); font-size: 0.88rem; margin-top: 0.15rem; }
+
+/* ── Climate figures ── */
+.fx-fig-title { font-weight: 600; font-size: 0.95rem; color: var(--fx-ink); margin: 0.6rem 0 0.15rem; }
+.fx-fig-desc { color: var(--fx-muted); font-size: 0.85rem; margin-bottom: 0.5rem; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -181,9 +291,9 @@ hr {
 # CONSTANTS & HELPERS
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Zone color scheme (index 0 = nodata/background)
-ZONE_HEX = {0: "#0f172a", 1: "#1a9850", 2: "#a6d96a", 3: "#fee08b",
-             4: "#f46d43", 5: "#a50026"}
+# Zone colour scheme (index 0 = nodata/background)
+ZONE_HEX = {0: "#00000000", 1: "#1a9850", 2: "#a6d96a", 3: "#fee08b",
+            4: "#f46d43", 5: "#a50026"}
 ZONE_RGBA = {
     0: (0, 0, 0, 0),
     1: (26, 152, 80, 160),
@@ -191,6 +301,94 @@ ZONE_RGBA = {
     3: (254, 224, 139, 175),
     4: (244, 109, 67, 185),
     5: (165, 0, 38, 200),
+}
+# Text colour that reads on each zone swatch
+ZONE_INK = {1: "#ffffff", 2: "#1c1f23", 3: "#1c1f23", 4: "#1c1f23", 5: "#ffffff"}
+
+# Mid-tones that read on both the light and the dark background
+NEUTRAL_BAR = "#9aa1a8"
+NEUTRAL_RULE = "#7d848b"
+SERIES_REF = "#7d848b"     # observed / reference series
+SERIES_MODEL = "#3a87c8"   # simulated / model series
+SERIES_PEAK = "#c96a3d"
+
+ESRI_ATTR = "Tiles &copy; Esri &mdash; Esri, HERE, Garmin, &copy; OpenStreetMap contributors"
+ESRI_CANVAS = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/{}/MapServer/tile/{{z}}/{{y}}/{{x}}"
+MAP_OUTLINE = {"light": "#33383e", "dark": "#d4d6d9"}
+
+# Leaflet chrome inside the map iframe; .fx-dark is toggled by MapFollowsTheme.
+MAP_CSS = """<style>
+.leaflet-container { font-family: "IBM Plex Sans", "Segoe UI", sans-serif; }
+/* Leaflet sizes the layer list while the tab is still hidden and adds a needless scrollbar */
+.leaflet-control-layers-list { height: auto !important; }
+.leaflet-control-layers-scrollbar { overflow-y: visible !important; padding-right: 6px !important; }
+/* Phone-width map (the iframe's own width): keep the layer list from covering the map */
+@media (max-width: 560px) {
+    .leaflet-control-layers-expanded { padding: 4px 8px 4px 6px; font-size: 11px; line-height: 1.35; }
+    .leaflet-control-layers-selector { margin-top: 1px; }
+}
+.leaflet-tooltip.fx-tip {
+    background: #ffffff; color: #1c1f23; border: 1px solid #d5d1c7; border-radius: 3px;
+    box-shadow: none; padding: 5px 9px; font-size: 13px;
+}
+.leaflet-tooltip.fx-tip:before { display: none; }
+.fx-dark .leaflet-tooltip.fx-tip { background: #1f2225; color: #e3e1db; border-color: #34383c; }
+.fx-dark .leaflet-control-layers, .fx-dark .leaflet-bar a {
+    background: #1f2225; color: #e3e1db; border-color: #34383c;
+}
+.fx-dark .leaflet-control-layers-separator { border-top-color: #34383c; }
+.fx-dark .leaflet-control-attribution { background: rgba(20, 22, 24, 0.8); color: #a0a5ab; }
+.fx-dark .leaflet-control-attribution a { color: #86b6e0; }
+.fx-dark .leaflet-control-scale-line { background: rgba(20, 22, 24, 0.7); color: #e3e1db; border-color: #a0a5ab; }
+</style>"""
+
+
+class MapFollowsTheme(MacroElement):
+    """Keep the map in step with the app theme without a Streamlit rerun.
+
+    The map runs in a same-origin component iframe, so it can read the
+    color-scheme Streamlit sets on .stApp in the parent page. When that flips,
+    swap the basemap and the LGA outline colour. A basemap the viewer picks by
+    hand stays until the theme changes again.
+    """
+    _template = Template("""
+        {% macro script(this, kwargs) %}
+        (function () {
+            var map = {{ this._parent.get_name() }};
+            var light = {{ this.light.get_name() }}, dark = {{ this.dark.get_name() }};
+            var outlines = {{ this.outlines.get_name() }};
+            var current = null;
+            function apply() {
+                var app;
+                try { app = window.parent.document.querySelector(".stApp"); } catch (e) { return; }
+                if (!app) { return; }
+                var isDark = window.parent.getComputedStyle(app).colorScheme === "dark";
+                if (isDark === current) { return; }
+                current = isDark;
+                var on = isDark ? dark : light, off = isDark ? light : dark;
+                if (map.hasLayer(off)) { map.removeLayer(off); }
+                if (!map.hasLayer(on)) { map.addLayer(on); }
+                on.bringToBack();
+                outlines.setStyle({color: isDark ? {{ this.outline_dark }} : {{ this.outline_light }}});
+                map.getContainer().classList.toggle("fx-dark", isDark);
+            }
+            apply();
+            setInterval(apply, 800);
+        })();
+        {% endmacro %}
+    """)
+
+    def __init__(self, light, dark, outlines):
+        super().__init__()
+        self._name = "MapFollowsTheme"
+        self.light, self.dark, self.outlines = light, dark, outlines
+        self.outline_light = json.dumps(MAP_OUTLINE["light"])
+        self.outline_dark = json.dumps(MAP_OUTLINE["dark"])
+
+FACTOR_LABELS = {
+    "elevation": "Elevation", "twi": "TWI", "dist_rivers": "Dist. to rivers",
+    "flow_accum": "Flow accum.", "runoff": "Runoff", "slope": "Slope",
+    "rainfall": "Rainfall", "lulc": "LULC",
 }
 
 PRESET_LOCATIONS = {
@@ -204,6 +402,9 @@ PRESET_LOCATIONS = {
     "Ikorodu": (6.6194, 3.5105),
 }
 
+SCENARIO_MODES = ["Percentage change", "NIMET return-period wet year"]
+MONTHS = [calendar.month_abbr[m] for m in range(1, 13)]
+
 
 def _fmt(val, unit="", decimals=1):
     """Format a numeric value safely (returns 'N/A' for None)."""
@@ -212,6 +413,50 @@ def _fmt(val, unit="", decimals=1):
     if isinstance(val, float):
         return f"{val:,.{decimals}f}{unit}"
     return str(val)
+
+
+def _people(n):
+    """Compact population figure: 6.91 M, 692 K, 312."""
+    if n >= 1e6:
+        return f"{n / 1e6:.2f} M"
+    if n >= 1e3:
+        return f"{n / 1e3:.0f} K"
+    return f"{n:.0f}"
+
+
+def _dark():
+    return st.context.theme.type == "dark"
+
+
+def section(title, lede=None):
+    lede_html = f'<p class="fx-lede">{lede}</p>' if lede else ""
+    st.markdown(
+        f'<div class="fx-section"><div class="fx-h2" role="heading" aria-level="2">'
+        f'{title}</div>{lede_html}</div>', unsafe_allow_html=True)
+
+
+def subhead(title):
+    st.markdown(f'<div class="fx-h3" role="heading" aria-level="3">{title}</div>',
+                unsafe_allow_html=True)
+
+
+def label(text):
+    st.markdown(f'<div class="fx-label">{text}</div>', unsafe_allow_html=True)
+
+
+_callout_ids = itertools.count()
+
+
+def callout(md, tone="info"):
+    """A note with a coloured left rule. tone: info, caution, negative, positive."""
+    with st.container(key=f"fx-callout-{tone}-{next(_callout_ids)}"):
+        st.markdown(md)
+
+
+def zone_chips():
+    chips = "".join(f'<span><i style="background:{ZONE_HEX[z]}"></i>{n}</span>'
+                    for z, n in M.ZONE_NAMES.items())
+    st.markdown(f'<div class="fx-chips">{chips}</div>', unsafe_allow_html=True)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -245,6 +490,14 @@ def get_hazard_overlay():
 
 
 @st.cache_data(ttl=3600)
+def _outside_lgas(height, width, transform_gdal, crs_wkt):
+    """Boolean mask, True outside the 20 LGA polygons, on a scenario raster's grid."""
+    lgas = M.lga_boundaries().to_crs(crs_wkt)
+    return geometry_mask(lgas.geometry, out_shape=(height, width),
+                         transform=Affine.from_gdal(*transform_gdal))
+
+
+@st.cache_data(ttl=3600)
 def get_lga_json():
     """Load LGA boundaries as GeoJSON string."""
     return M.lga_boundaries().to_json()
@@ -271,125 +524,130 @@ def get_climatology():
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# CHART HELPERS
+# CHARTS (Altair, so axes and labels follow the active Streamlit theme)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _dark_fig(figsize=(10, 6)):
-    """Create a matplotlib figure pre-styled for the dark theme."""
-    fig, ax = plt.subplots(figsize=figsize)
-    fig.patch.set_facecolor("#0f172a")
-    ax.set_facecolor("#0f172a")
-    ax.tick_params(colors="#94a3b8", labelsize=9)
-    for spine in ax.spines.values():
-        spine.set_color("#334155")
-    return fig, ax
+def chart_lga_ranking(df, statewide_pct):
+    """Horizontal bars of % population in High/Very High per LGA, most exposed first."""
+    d = df[["lga_name", "pct_high_very_high"]].copy()
+    d["above"] = d["pct_high_very_high"] >= statewide_pct
+    xmax = float(d["pct_high_very_high"].max()) * 1.12
+    base = alt.Chart(d).encode(
+        y=alt.Y("lga_name:N", title=None,
+                sort=list(d.sort_values("pct_high_very_high", ascending=False)["lga_name"]),
+                axis=alt.Axis(labelLimit=200, ticks=False, domain=False, minExtent=118)),
+        x=alt.X("pct_high_very_high:Q", title="Population in High / Very High zones (%)",
+                scale=alt.Scale(domain=[0, xmax])),
+    )
+    bars = base.mark_bar(size=15, cornerRadiusEnd=2).encode(
+        color=alt.when(alt.datum.above).then(alt.value(ZONE_HEX[4]))
+                 .otherwise(alt.value(NEUTRAL_BAR)),
+        tooltip=[alt.Tooltip("lga_name:N", title="LGA"),
+                 alt.Tooltip("pct_high_very_high:Q", title="% High / Very High", format=".1f")],
+    )
+    values = base.mark_text(align="left", dx=4, fontSize=11).encode(
+        text=alt.Text("pct_high_very_high:Q", format=".1f"))
+    statewide = alt.Chart(pd.DataFrame({"v": [statewide_pct]})).mark_rule(
+        strokeDash=[4, 3], color=NEUTRAL_RULE).encode(x="v:Q")
+    return (bars + values + statewide).properties(height=24 * len(d))
 
 
-def plot_lga_exposure_bar(df):
-    """Horizontal bar chart of LGA exposure, sorted descending."""
-    df_s = df.sort_values("pct_high_very_high", ascending=True).copy()
-    fig, ax = _dark_fig(figsize=(10, 8))
-
-    cmap = plt.cm.RdYlGn_r
-    norm = plt.Normalize(df_s["pct_high_very_high"].min(),
-                         df_s["pct_high_very_high"].max())
-    colors = cmap(norm(df_s["pct_high_very_high"]))
-
-    bars = ax.barh(df_s["lga_name"], df_s["pct_high_very_high"],
-                   color=colors, edgecolor="none", height=0.72)
-
-    ax.set_xlabel("Population in High / Very High Zones (%)",
-                  color="#94a3b8", fontsize=11, labelpad=10)
-    ax.set_title("LGA Flood Exposure Ranking",
-                 color="#e2e8f0", fontsize=15, fontweight="bold", pad=14)
-    ax.xaxis.grid(True, alpha=0.08, color="#475569")
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-
-    for bar, val in zip(bars, df_s["pct_high_very_high"]):
-        ax.text(bar.get_width() + 0.4, bar.get_y() + bar.get_height() / 2,
-                f"{val:.1f}%", va="center", color="#cbd5e1", fontsize=8.5,
-                fontweight="500")
-
-    plt.tight_layout()
-    return fig
+def chart_zone_shares(baseline):
+    """Share of the modelled population in each hazard zone."""
+    total = baseline["total"]
+    d = pd.DataFrame([{"zone": n, "order": z, "share": 100 * baseline.get(n, 0) / total,
+                       "label": f"{_people(baseline.get(n, 0))}  ({100 * baseline.get(n, 0) / total:.1f}%)"}
+                      for z, n in M.ZONE_NAMES.items()])
+    base = alt.Chart(d).encode(
+        y=alt.Y("zone:N", sort=list(M.ZONE_NAMES.values()), title=None,
+                axis=alt.Axis(ticks=False, domain=False, minExtent=72)),
+        x=alt.X("share:Q", title="Share of modelled population (%)",
+                scale=alt.Scale(domain=[0, float(d["share"].max()) * 1.6])),
+    )
+    bars = base.mark_bar(size=18, cornerRadiusEnd=2).encode(
+        color=alt.Color("zone:N", legend=None,
+                        scale=alt.Scale(domain=list(M.ZONE_NAMES.values()),
+                                        range=[ZONE_HEX[z] for z in M.ZONE_NAMES])),
+        tooltip=[alt.Tooltip("zone:N", title="Zone"), alt.Tooltip("label:N", title="People")],
+    )
+    values = base.mark_text(align="left", dx=4, fontSize=11).encode(text="label:N")
+    return (bars + values).properties(height=40 * len(d))
 
 
-def plot_zone_donut(baseline):
-    """Donut chart of statewide zone population shares."""
-    labels = list(M.ZONE_NAMES.values())
-    sizes = [baseline.get(l, 0) for l in labels]
-    colors_list = [ZONE_HEX[i] for i in range(1, 6)]
-
-    fig, ax = _dark_fig(figsize=(5, 5))
-    wedges, texts, autotexts = ax.pie(
-        sizes, labels=None, colors=colors_list, autopct="%1.1f%%",
-        startangle=140, pctdistance=0.78,
-        wedgeprops=dict(width=0.42, edgecolor="#0f172a", linewidth=2))
-
-    for t in autotexts:
-        t.set_color("#e2e8f0")
-        t.set_fontsize(9)
-        t.set_fontweight("bold")
-
-    ax.legend(labels, loc="center left", bbox_to_anchor=(1, 0.5),
-              fontsize=9, frameon=False, labelcolor="#cbd5e1")
-    ax.set_title("Population by Hazard Zone", color="#e2e8f0",
-                 fontsize=13, fontweight="bold", pad=10)
-    plt.tight_layout()
-    return fig
-
-
-def plot_scenario_zones(zones, title):
-    """Render a recomputed hazard-zone array as a styled matplotlib image."""
-    cmap = ListedColormap([ZONE_HEX[i] for i in range(6)])
-    norm = BoundaryNorm(range(7), cmap.N)
-
-    fig, ax = _dark_fig(figsize=(10, 7))
-    ax.imshow(zones, cmap=cmap, norm=norm, interpolation="nearest")
-    ax.set_title(title, color="#e2e8f0", fontsize=14, fontweight="bold", pad=12)
-    ax.axis("off")
-
-    handles = [plt.Rectangle((0, 0), 1, 1, color=ZONE_HEX[i]) for i in range(1, 6)]
-    leg = ax.legend(handles, list(M.ZONE_NAMES.values()), loc="lower left",
-                    fontsize=9, framealpha=0.85, facecolor="#1e293b",
-                    edgecolor="#334155", labelcolor="#e2e8f0")
-    plt.tight_layout()
-    return fig
+def chart_scenario_change(exp):
+    """Per-zone % change in population vs the baseline, either side of zero."""
+    d = pd.DataFrame([{"zone": n, "order": z, "pct": exp[n]["pct_change"],
+                       "label": f"{exp[n]['pct_change']:+.2f}%"}
+                      for z, n in M.ZONE_NAMES.items()])
+    lim = max(abs(d["pct"]).max(), 0.05) * 1.6
+    base = alt.Chart(d).encode(
+        y=alt.Y("zone:N", sort=list(M.ZONE_NAMES.values()), title=None,
+                axis=alt.Axis(ticks=False, domain=False, minExtent=72)),
+        x=alt.X("pct:Q", title="Change in population vs baseline (%)",
+                scale=alt.Scale(domain=[-lim, lim])),
+    )
+    bars = base.mark_bar(size=18).encode(
+        color=alt.Color("zone:N", legend=None,
+                        scale=alt.Scale(domain=list(M.ZONE_NAMES.values()),
+                                        range=[ZONE_HEX[z] for z in M.ZONE_NAMES])),
+        tooltip=[alt.Tooltip("zone:N", title="Zone"), alt.Tooltip("label:N", title="Change")],
+    )
+    pos = base.transform_filter(alt.datum.pct >= 0).mark_text(
+        align="left", dx=4, fontSize=11).encode(text="label:N")
+    neg = base.transform_filter(alt.datum.pct < 0).mark_text(
+        align="right", dx=-4, fontSize=11).encode(text="label:N")
+    zero = alt.Chart(pd.DataFrame({"v": [0]})).mark_rule(color=NEUTRAL_RULE).encode(x="v:Q")
+    return (bars + pos + neg + zero).properties(height=40 * len(d))
 
 
-def plot_scenario_comparison(baseline, scenario_exp):
-    """Grouped bar chart comparing baseline vs scenario population per zone."""
-    labels = list(M.ZONE_NAMES.values())
-    base_vals = [baseline.get(l, 0) for l in labels]
-    scn_vals = [scenario_exp[l]["people"] for l in labels]
+def chart_monthly(series, y_title):
+    """Lines over Jan–Dec in calendar order. series: {reference name: 12 values,
+    model name: 12 values}; the first is drawn grey, the second blue."""
+    d = pd.DataFrame([{"month": MONTHS[i], "series": name, "value": v}
+                      for name, vals in series.items() for i, v in enumerate(vals)])
+    return alt.Chart(d).mark_line(point=True, strokeWidth=2).encode(
+        x=alt.X("month:N", sort=MONTHS, title=None, axis=alt.Axis(labelAngle=0)),
+        y=alt.Y("value:Q", title=y_title),
+        color=alt.Color("series:N", sort=list(series), title=None,
+                        scale=alt.Scale(domain=list(series), range=[SERIES_REF, SERIES_MODEL]),
+                        legend=alt.Legend(orient="top")),
+        tooltip=[alt.Tooltip("month:N", title="Month"), alt.Tooltip("series:N", title="Series"),
+                 alt.Tooltip("value:Q", title=y_title, format=",.1f")],
+    ).properties(height=300)
 
-    x = np.arange(len(labels))
-    width = 0.35
 
-    fig, ax = _dark_fig(figsize=(10, 5))
-    bars1 = ax.bar(x - width / 2, base_vals, width, label="Baseline",
-                   color="#0891b2", edgecolor="none", alpha=0.85)
-    bars2 = ax.bar(x + width / 2, scn_vals, width, label="Scenario",
-                   color="#a855f7", edgecolor="none", alpha=0.85)
+def chart_swat_scenarios(sc):
+    """Mean and peak-month outlet flow per rainfall scenario, side by side."""
+    order = [s["label"] for s in sc]
+    d = pd.DataFrame(sc)[["label", "mean", "peak"]].melt(
+        id_vars="label", var_name="measure", value_name="flow")
+    d["measure"] = d["measure"].map({"mean": "Mean flow", "peak": "Peak month"})
+    return alt.Chart(d).mark_bar().encode(
+        x=alt.X("label:N", sort=order, title=None, axis=alt.Axis(labelAngle=0)),
+        xOffset=alt.XOffset("measure:N"),
+        y=alt.Y("flow:Q", title="Outlet discharge (m³/s)"),
+        color=alt.Color("measure:N", title=None, legend=alt.Legend(orient="top"),
+                        scale=alt.Scale(domain=["Mean flow", "Peak month"],
+                                        range=[SERIES_MODEL, SERIES_PEAK])),
+        tooltip=[alt.Tooltip("label:N", title="Scenario"), alt.Tooltip("measure:N", title=" "),
+                 alt.Tooltip("flow:Q", title="m³/s", format=",.0f")],
+    ).properties(height=280)
 
-    ax.set_xticks(x)
-    ax.set_xticklabels(labels, color="#94a3b8", fontsize=10)
-    ax.set_ylabel("Population", color="#94a3b8", fontsize=11)
-    ax.set_title("Baseline vs Scenario — Population per Zone",
-                 color="#e2e8f0", fontsize=14, fontweight="bold", pad=12)
-    ax.legend(facecolor="#1e293b", edgecolor="#334155", labelcolor="#e2e8f0",
-              fontsize=10)
-    ax.yaxis.grid(True, alpha=0.08, color="#475569")
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
 
-    # Format y-axis with millions
-    ax.yaxis.set_major_formatter(plt.FuncFormatter(
-        lambda v, _: f"{v / 1e6:.1f}M" if v >= 1e6 else f"{v / 1e3:.0f}K"))
-
-    plt.tight_layout()
-    return fig
+def scenario_zones_image(zones, ref):
+    """Scenario zones clipped to the LGAs, cropped to them, on a transparent ground."""
+    outside = _outside_lgas(ref["height"], ref["width"],
+                            ref["transform"].to_gdal(), ref["crs"].to_wkt())
+    z = zones.copy()
+    z[outside] = 0
+    rows = np.where(~outside.all(axis=1))[0]
+    cols = np.where(~outside.all(axis=0))[0]
+    z = z[rows[0]:rows[-1] + 1, cols[0]:cols[-1] + 1][::2, ::2]
+    rgba = np.zeros((*z.shape, 4), dtype=np.uint8)
+    for k in M.ZONE_NAMES:
+        r, g, b = (int(ZONE_HEX[k][i:i + 2], 16) for i in (1, 3, 5))
+        rgba[z == k] = (r, g, b, 255)
+    return Image.fromarray(rgba)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -421,33 +679,19 @@ def _zones_geotiff(zones, ref):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# HEADER & DISCLAIMER
+# MASTHEAD & DISCLAIMER
 # ═══════════════════════════════════════════════════════════════════════════════
 
 st.markdown("""
-<div style="text-align:center; padding:0.8rem 0 0.3rem 0;">
-    <h1 style="font-size:2.3rem; margin-bottom:0.15rem;
-               background:linear-gradient(135deg,#06b6d4,#8b5cf6);
-               -webkit-background-clip:text; -webkit-text-fill-color:transparent;
-               font-weight:800; letter-spacing:-0.02em;">
-        🌊 Lagos Flood Hazard Explorer
-    </h1>
-    <p style="color:#64748b; font-size:0.95rem; margin-top:0;">
-        Interactive Decision-Support Tool &nbsp;·&nbsp; Hazard &nbsp;·&nbsp; Exposure &nbsp;·&nbsp; Scenarios
-    </p>
-</div>
-""", unsafe_allow_html=True)
-
-st.markdown("""
-<div style="background:linear-gradient(135deg,rgba(245,158,11,0.08),rgba(239,68,68,0.08));
-            border:1px solid rgba(245,158,11,0.25); border-radius:10px;
-            padding:0.55rem 1rem; margin-bottom:0.8rem;">
-    <span style="color:#fbbf24;">⚠️</span>
-    <span style="color:#94a3b8; font-size:0.82rem;">
-        This is a <strong style="color:#e2e8f0;">hazard &amp; exposure decision-support tool</strong>
-        — <em>not</em> a dated flood forecast. It shows where flooding is likely and models
-        what-if rainfall scenarios.
-    </span>
+<div class="fx-masthead">
+    <div class="fx-overline">University of Lagos &nbsp;·&nbsp; Department of Civil &amp; Environmental Engineering</div>
+    <div class="fx-title" role="heading" aria-level="1">Lagos Flood Hazard Explorer</div>
+    <p class="fx-sub">Interactive decision-support tool for flood hazard, population exposure
+       and rainfall scenarios across the 20 Local Government Areas of Lagos State.</p>
+    <div class="fx-disclaimer">
+        This is a <strong>hazard &amp; exposure decision-support tool</strong>, <em>not</em> a
+        dated flood forecast. It shows where flooding is likely and models what-if rainfall scenarios.
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -457,64 +701,37 @@ st.markdown("""
 # ═══════════════════════════════════════════════════════════════════════════════
 
 with st.sidebar:
-    st.markdown("""
-    <div style="text-align:center; padding:0.8rem 0;">
-        <div style="font-size:2.2rem;">🎓</div>
-        <div style="color:#e2e8f0; font-weight:700; font-size:1rem; margin-top:0.3rem;">
-            Final Year Project
-        </div>
-        <div style="color:#64748b; font-size:0.78rem; margin-top:0.15rem;">
-            Civil &amp; Environmental Engineering
-        </div>
-    </div>
+    _wmax = max(M.WEIGHTS.values())
+    _rows = "".join(
+        f'<tr><td class="n">{FACTOR_LABELS.get(k, k)}</td>'
+        f'<td class="b"><div class="bar" style="width:{100 * w / _wmax:.0f}%"></div></td>'
+        f'<td class="v">{w:.2f}</td></tr>'
+        for k, w in M.WEIGHTS.items())
+    st.markdown(f"""
+    <div class="fx-label">Final year project</div>
+    <div class="fx-side-title">Flood Risk Analysis and Visualization Web Portal for
+        Lagos State, Nigeria</div>
+    <dl class="fx-dl">
+        <dt>Student</dt><dd>Attah Gbubemi David (190402060)</dd>
+        <dt>Supervisor</dt><dd>Dr O. C. Echeta</dd>
+        <dt>Institution</dt><dd>Department of Civil &amp; Environmental Engineering,
+            University of Lagos</dd>
+    </dl>
+    <div class="fx-label">Models</div>
+    <ul class="fx-list">
+        <li>AHP multi-criteria index (8 factors)</li>
+        <li>Gumbel EV-I return periods</li>
+        <li>SCS-CN runoff recomputation</li>
+        <li>SWAT+ Ogun streamflow (calibrated)</li>
+    </ul>
+    <div class="fx-label">AHP factor weights</div>
+    <table class="fx-weights">
+        {_rows}
+        <tr class="total"><td class="n">Total</td><td></td>
+            <td class="v">{sum(M.WEIGHTS.values()):.2f}</td></tr>
+    </table>
     """, unsafe_allow_html=True)
-
-    st.divider()
-
-    st.markdown("""
-    <div style="font-size:0.82rem; line-height:1.7; color:#94a3b8;">
-        <strong style="color:#cbd5e1;">Title:</strong><br>
-        Flood Risk Analysis and Visualization Web Portal for Lagos State, Nigeria<br><br>
-        <strong style="color:#cbd5e1;">Student:</strong><br>
-        Attah Gbubemi David (190402060)<br><br>
-        <strong style="color:#cbd5e1;">Supervisor:</strong><br>
-        Dr O. C. Echeta<br><br>
-        <strong style="color:#cbd5e1;">Institution:</strong><br>
-        Department of Civil &amp; Environmental Engineering<br>
-        University of Lagos<br><br>
-        <strong style="color:#cbd5e1;">Model:</strong><br>
-        AHP Multi-Criteria (8 factors)<br>
-        Gumbel EV-I Return Periods<br>
-        SCS-CN Runoff Recomputation<br>
-        SWAT+ Ogun Streamflow (calibrated)
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.divider()
-
-    st.markdown("""
-    <div style="background:rgba(6,182,212,0.08); border:1px solid rgba(6,182,212,0.2);
-                border-radius:8px; padding:0.6rem 0.8rem; margin-top:0.2rem;">
-        <div style="color:#06b6d4; font-weight:700; font-size:0.78rem;
-                    text-transform:uppercase; letter-spacing:0.06em; margin-bottom:0.3rem;">
-            AHP Factor Weights
-        </div>
-        <table style="width:100%; font-size:0.75rem; color:#94a3b8;">
-            <tr><td>Elevation</td>      <td style="text-align:right; color:#e2e8f0;">0.20</td></tr>
-            <tr><td>TWI</td>            <td style="text-align:right; color:#e2e8f0;">0.18</td></tr>
-            <tr><td>Dist. to Rivers</td><td style="text-align:right; color:#e2e8f0;">0.15</td></tr>
-            <tr><td>Flow Accum.</td>    <td style="text-align:right; color:#e2e8f0;">0.12</td></tr>
-            <tr><td>Runoff</td>         <td style="text-align:right; color:#e2e8f0;">0.12</td></tr>
-            <tr><td>Slope</td>          <td style="text-align:right; color:#e2e8f0;">0.10</td></tr>
-            <tr><td>Rainfall</td>       <td style="text-align:right; color:#e2e8f0;">0.08</td></tr>
-            <tr><td>LULC</td>           <td style="text-align:right; color:#e2e8f0;">0.05</td></tr>
-            <tr style="border-top:1px solid #334155;">
-                <td style="font-weight:700; color:#cbd5e1;">Total</td>
-                <td style="text-align:right; font-weight:700; color:#06b6d4;">1.00</td>
-            </tr>
-        </table>
-    </div>
-    """, unsafe_allow_html=True)
+    st.caption("Light or dark theme: open the ⋮ menu at the top right.")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -523,104 +740,92 @@ with st.sidebar:
 
 (tab_overview, tab_map, tab_query, tab_exposure, tab_scenario, tab_climate,
  tab_hydro, tab_valid) = st.tabs([
-    "📖 Overview",
-    "🗺️ Hazard Map",
-    "📍 Point Query",
-    "👥 Exposure",
-    "🌧️ Scenario",
-    "📊 Climate",
-    "🌊 Hydrology (SWAT+)",
-    "✅ Validation",
+    "Overview",
+    "Hazard map",
+    "Point query",
+    "Exposure",
+    "Scenario",
+    "Climate",
+    "Hydrology (SWAT+)",
+    "Validation",
 ])
 
 # ─────────────────────── TAB 1 — PROJECT OVERVIEW ────────────────────────────
 with tab_overview:
-    st.markdown("""
-    <div style="max-width:900px;">
-        <h2 style="color:#e2e8f0; font-weight:700; margin-bottom:0.5rem;">
-            Flood Risk Analysis and Visualization Web Portal
-        </h2>
-        <p style="color:#64748b; font-size:0.9rem; font-style:italic; margin-bottom:1.2rem;">
-            Lagos State, Nigeria — Final Year Project
-        </p>
-    </div>
+    section("Flood Risk Analysis and Visualization Web Portal",
+            "Lagos State, Nigeria · Final year project")
+
+    # Derived from real_baseline_exposure() rather than hardcoded, so these
+    # figures cannot drift from the Exposure tab or from the thesis. The
+    # denominator is the WorldPop total inside the LGA boundaries (12.42 M), NOT
+    # a metro-wide population estimate — mixing the two previously produced
+    # 22.8% here against 38.7% in the Exposure tab and in the report.
+    _b = get_baseline()
+    _hv_m = _b["High+VeryHigh"] / 1e6
+    _hv_pct = 100 * _b["High+VeryHigh"] / _b["total"]
+    _tot_m = _b["total"] / 1e6
+    _topo = 100 * (M.WEIGHTS["elevation"] + M.WEIGHTS["twi"])
+    _rain = 100 * (M.WEIGHTS["runoff"] + M.WEIGHTS["rainfall"])
+
+    st.markdown(f"""
+    <div class="fx-figwrap"><div class="fx-figures">
+        <div class="fx-fig"><div class="fx-fig-n">{_hv_m:.2f} M</div>
+            <div class="fx-fig-l">people live in High or Very High hazard zones</div></div>
+        <div class="fx-fig"><div class="fx-fig-n">{_hv_pct:.1f}%</div>
+            <div class="fx-fig-l">of the {_tot_m:.2f} M residents in the WorldPop analysis grid</div></div>
+        <div class="fx-fig"><div class="fx-fig-n">{_topo:.0f}%</div>
+            <div class="fx-fig-l">of the hazard index weight is topography (elevation + TWI)</div></div>
+        <div class="fx-fig"><div class="fx-fig-n">+0.44 °C</div>
+            <div class="fx-fig-l">warming per decade at Ikeja, 1996–2025 (significant trend)</div></div>
+    </div></div>
     """, unsafe_allow_html=True)
 
-    c1, c2, c3 = st.columns(3)
+    c1, c2, c3 = st.columns(3, gap="large")
 
     with c1:
         st.markdown("""
-        <div style="background:linear-gradient(145deg,rgba(15,23,42,0.8),rgba(30,41,59,0.6));
-                    border:1px solid rgba(100,116,139,0.15); border-radius:14px;
-                    padding:1.2rem 1.4rem; height:100%;">
-            <div style="color:#f97316; font-weight:700; font-size:0.82rem;
-                        text-transform:uppercase; letter-spacing:0.06em;
-                        margin-bottom:0.6rem;">🔍 Problem Statement</div>
-            <p style="color:#cbd5e1; font-size:0.85rem; line-height:1.65;">
-                Lagos State, with over <strong>20 million residents</strong> in a low-lying
-                coastal setting, faces recurring and devastating flooding. Rapid urbanization,
-                inadequate drainage infrastructure, and increasingly variable rainfall
-                amplify the risk. This project develops a <em>spatial decision-support
-                framework</em> to quantify and visualize flood hazard and population exposure
-                across all 20 Local Government Areas.
-            </p>
-        </div>
+        <div class="fx-label">Problem statement</div>
+        <div class="fx-prose"><p>
+            Lagos State, with over <strong>20 million residents</strong> in a low-lying
+            coastal setting, faces recurring and devastating flooding. Rapid urbanization,
+            inadequate drainage infrastructure, and increasingly variable rainfall
+            amplify the risk. This project develops a <em>spatial decision-support
+            framework</em> to quantify and visualize flood hazard and population exposure
+            across all 20 Local Government Areas.
+        </p></div>
         """, unsafe_allow_html=True)
 
     with c2:
         st.markdown("""
-        <div style="background:linear-gradient(145deg,rgba(15,23,42,0.8),rgba(30,41,59,0.6));
-                    border:1px solid rgba(100,116,139,0.15); border-radius:14px;
-                    padding:1.2rem 1.4rem; height:100%;">
-            <div style="color:#06b6d4; font-weight:700; font-size:0.82rem;
-                        text-transform:uppercase; letter-spacing:0.06em;
-                        margin-bottom:0.6rem;">🔬 Methodology</div>
-            <p style="color:#cbd5e1; font-size:0.85rem; line-height:1.65;">
-                <strong>AHP Weighted Overlay</strong> of 8 conditioning factors — elevation,
-                TWI, proximity to rivers, flow accumulation, SCS-CN runoff depth, slope,
-                extreme rainfall, and land-use — to produce a continuous <em>Flood Hazard
-                Index (0–1)</em> classified into 5 zones.<br><br>
-                <strong>Gumbel EV-I</strong> model fitted to 30 years of NIMET rainfall
-                to estimate design storms for 2–100 year return periods.<br><br>
-                <strong>WorldPop 2020</strong> grid for population exposure analysis.
-            </p>
+        <div class="fx-label">Methodology</div>
+        <div class="fx-prose">
+            <p><strong>AHP Weighted Overlay</strong> of 8 conditioning factors — elevation,
+            TWI, proximity to rivers, flow accumulation, SCS-CN runoff depth, slope,
+            extreme rainfall, and land-use — to produce a continuous <em>Flood Hazard
+            Index (0–1)</em> classified into 5 zones.</p>
+            <p><strong>Gumbel EV-I</strong> model fitted to 30 years of NIMET rainfall
+            to estimate design annual rainfall for 2–100 year return periods.</p>
+            <p><strong>WorldPop 2020</strong> grid for population exposure analysis.</p>
         </div>
         """, unsafe_allow_html=True)
 
     with c3:
-        # Derived from real_baseline_exposure() rather than hardcoded, so this card
-        # cannot drift from the Exposure tab or from the thesis. The denominator is
-        # the WorldPop total inside the LGA boundaries (12.42 M), NOT a metro-wide
-        # population estimate — mixing the two previously produced 22.8% here
-        # against 38.7% in the Exposure tab and in the report.
-        _b = get_baseline()
-        _hv_m = _b["High+VeryHigh"] / 1e6
-        _hv_pct = 100 * _b["High+VeryHigh"] / _b["total"]
-        _tot_m = _b["total"] / 1e6
         st.markdown(f"""
-        <div style="background:linear-gradient(145deg,rgba(15,23,42,0.8),rgba(30,41,59,0.6));
-                    border:1px solid rgba(100,116,139,0.15); border-radius:14px;
-                    padding:1.2rem 1.4rem; height:100%;">
-            <div style="color:#a855f7; font-weight:700; font-size:0.82rem;
-                        text-transform:uppercase; letter-spacing:0.06em;
-                        margin-bottom:0.6rem;">📊 Key Findings</div>
-            <p style="color:#cbd5e1; font-size:0.85rem; line-height:1.65;">
-                <strong>~{_hv_m:.2f} million people</strong> reside in High or Very High hazard
-                zones — <strong>{_hv_pct:.1f}%</strong> of the {_tot_m:.2f} million residents
-                captured in the WorldPop analysis grid.<br><br>
-                Flood hazard is <strong>topography-dominated</strong>: elevation + TWI account
-                for 38% of the index weight. Rainfall factors contribute 20%, meaning rainfall
-                scenario effects are intentionally modest — the map is structurally realistic.<br><br>
-                Annual mean temperature shows a <strong>statistically significant increasing
-                trend</strong> (+0.44°C/decade), while annual rainfall shows no significant
-                long-term trend.
-            </p>
+        <div class="fx-label">Key findings</div>
+        <div class="fx-prose">
+            <p><strong>~{_hv_m:.2f} million people</strong> reside in High or Very High hazard
+            zones — <strong>{_hv_pct:.1f}%</strong> of the {_tot_m:.2f} million residents
+            captured in the WorldPop analysis grid.</p>
+            <p>Flood hazard is <strong>topography-dominated</strong>: elevation + TWI account
+            for {_topo:.0f}% of the index weight. Rainfall factors contribute {_rain:.0f}%, meaning
+            rainfall scenario effects are intentionally modest — the map is structurally realistic.</p>
+            <p>Annual mean temperature shows a <strong>statistically significant increasing
+            trend</strong> (+0.44°C/decade), while annual rainfall shows no significant
+            long-term trend.</p>
         </div>
         """, unsafe_allow_html=True)
 
-    st.markdown("<div style='height:0.8rem;'></div>", unsafe_allow_html=True)
-
-    with st.expander("📚 Data Sources & Limitations", expanded=False):
+    with st.expander("Data sources & limitations", expanded=False):
         st.markdown("""
         **Statewide hazard & exposure model (AHP)**
 
@@ -666,23 +871,18 @@ with tab_overview:
 
 # ─────────────────────── TAB 2 — HAZARD MAP ──────────────────────────────────
 with tab_map:
-    st.markdown("""
-    <h3 style="color:#e2e8f0; font-weight:700; margin-bottom:0.3rem;">
-        Baseline Flood Hazard Zones
-    </h3>
-    <p style="color:#64748b; font-size:0.85rem; margin-bottom:0.8rem;">
-        AHP-weighted overlay of 8 conditioning factors. Click LGA polygons for names.
-        Use layer controls (top-right) to toggle overlays.
-    </p>
-    """, unsafe_allow_html=True)
+    section("Baseline flood hazard zones",
+            "AHP-weighted overlay of 8 conditioning factors. Hover or tap an LGA for its name; "
+            "use the layer control (top right of the map) to switch basemap or toggle overlays.")
 
-    map_col, legend_col = st.columns([4, 1])
+    map_col, legend_col = st.columns([4, 1], gap="large")
 
     with map_col:
         b64_img, bounds = get_hazard_overlay()
         lga_json = get_lga_json()
         center_lat = (bounds[1] + bounds[3]) / 2
         center_lon = (bounds[0] + bounds[2]) / 2
+        dark = _dark()
 
         m = folium.Map(
             location=[center_lat, center_lon],
@@ -690,117 +890,79 @@ with tab_map:
             tiles=None,
             control_scale=True,
         )
-        # CARTO's free basemaps now return an "API KEY REQUIRED" tile; Esri's dark canvas needs no key.
-        folium.TileLayer(
-            "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
-            attr="Tiles &copy; Esri &mdash; Esri, HERE, Garmin, &copy; OpenStreetMap contributors",
-            name="Dark basemap (Esri)",
-            max_zoom=16,
-        ).add_to(m)
+        # CARTO's free basemaps now return an "API KEY REQUIRED" tile; Esri's canvases need no key.
+        # Both are offered; the one matching the app theme opens first, and
+        # MapFollowsTheme swaps them in the browser when the viewer switches theme.
+        light_tiles, dark_tiles = (
+            folium.TileLayer(ESRI_CANVAS.format(canvas), attr=ESRI_ATTR, name=name,
+                             max_zoom=16, show=show).add_to(m)
+            for name, canvas, show in (("Light basemap (Esri)", "World_Light_Gray_Base", not dark),
+                                       ("Dark basemap (Esri)", "World_Dark_Gray_Base", dark)))
 
         folium.raster_layers.ImageOverlay(
             image=f"data:image/png;base64,{b64_img}",
             bounds=[[bounds[1], bounds[0]], [bounds[3], bounds[2]]],
             opacity=0.75,
-            name="Flood Hazard Zones",
+            name="Flood hazard zones",
         ).add_to(m)
 
-        folium.GeoJson(
+        line = MAP_OUTLINE["dark" if dark else "light"]
+        outlines = folium.GeoJson(
             lga_json,
-            name="LGA Boundaries",
+            name="LGA boundaries",
             style_function=lambda x: {
                 "fillColor": "transparent",
-                "color": "#06b6d4",
-                "weight": 1.8,
-                "dashArray": "6, 4",
+                "color": line,
+                "weight": 1.2,
+                "opacity": 0.85,
             },
-            tooltip=folium.GeoJsonTooltip(
-                fields=["NAME_2"],
-                aliases=["LGA:"],
-                style="background-color:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px;padding:6px 10px;font-size:13px;",
-            ),
+            tooltip=folium.GeoJsonTooltip(fields=["NAME_2"], aliases=["LGA:"],
+                                          class_name="fx-tip"),
         ).add_to(m)
 
         folium.LayerControl(collapsed=False).add_to(m)
+        m.get_root().header.add_child(folium.Element(MAP_CSS), name="fx-map-css")
+        MapFollowsTheme(light_tiles, dark_tiles, outlines).add_to(m)
 
-        st_folium(m, width=None, height=580, returned_objects=[])
+        with st.container(key="fx-map"):
+            st_folium(m, width=None, height=600, returned_objects=[])
 
     with legend_col:
-        st.markdown("<div style='height:0.5rem;'></div>", unsafe_allow_html=True)
-        st.markdown("""
-        <div style="background:rgba(15,23,42,0.85); border:1px solid rgba(100,116,139,0.15);
-                    border-radius:12px; padding:1rem; font-size:0.82rem;">
-            <div style="color:#e2e8f0; font-weight:700; margin-bottom:0.7rem;
-                        text-transform:uppercase; font-size:0.75rem; letter-spacing:0.06em;">
-                Hazard Zone Legend
-            </div>
-        """, unsafe_allow_html=True)
-
-        for z in range(1, 6):
-            color = ZONE_HEX[z]
-            name = M.ZONE_NAMES[z]
-            lo = M.ZONE_BREAKS[z - 1]
-            hi = M.ZONE_BREAKS[z]
-            st.markdown(f"""
-            <div style="display:flex; align-items:center; margin-bottom:0.5rem;">
-                <div style="width:18px; height:18px; border-radius:4px;
-                            background:{color}; margin-right:8px; flex-shrink:0;
-                            border:1px solid rgba(255,255,255,0.1);"></div>
-                <div>
-                    <span style="color:#e2e8f0; font-weight:600;">{name}</span><br>
-                    <span style="color:#64748b; font-size:0.72rem;">{lo:.2f} – {hi:.2f}</span>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-        st.markdown("</div>", unsafe_allow_html=True)
-
-        st.markdown("<div style='height:0.8rem;'></div>", unsafe_allow_html=True)
-        st.markdown("""
-        <div style="background:rgba(6,182,212,0.06); border:1px solid rgba(6,182,212,0.15);
-                    border-radius:10px; padding:0.7rem 0.9rem;">
-            <div style="color:#06b6d4; font-weight:600; font-size:0.75rem;
-                        text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.3rem;">
-                Map Details
-            </div>
-            <div style="color:#94a3b8; font-size:0.75rem; line-height:1.6;">
-                CRS: EPSG:32631 (UTM 31N)<br>
-                Classification: Equal Interval<br>
-                Basemap: Esri Dark Gray Canvas<br>
-                LGA Boundaries: GADM
-            </div>
-        </div>
+        rows = "".join(
+            f'<div class="fx-legend-row"><span class="fx-sw" style="background:{ZONE_HEX[z]}"></span>'
+            f'{M.ZONE_NAMES[z]}<span class="fx-legend-range">'
+            f'{M.ZONE_BREAKS[z - 1]:.2f}–{min(M.ZONE_BREAKS[z], 1.0):.2f}</span></div>'
+            for z in range(1, 6))
+        st.markdown(f"""
+        <div class="fx-label">Hazard zone</div>
+        <div style="margin-bottom:1.6rem;">{rows}</div>
+        <div class="fx-label">Map details</div>
+        <dl class="fx-dl">
+            <dt>CRS</dt><dd>EPSG:32631 (UTM 31N)</dd>
+            <dt>Classes</dt><dd>Equal interval</dd>
+            <dt>Basemap</dt><dd>Esri Gray Canvas</dd>
+            <dt>LGAs</dt><dd>GADM</dd>
+        </dl>
         """, unsafe_allow_html=True)
 
 
 # ─────────────────────── TAB 3 — POINT QUERY ─────────────────────────────────
 with tab_query:
-    st.markdown("""
-    <h3 style="color:#e2e8f0; font-weight:700; margin-bottom:0.3rem;">
-        Location Hazard Inspector
-    </h3>
-    <p style="color:#64748b; font-size:0.85rem; margin-bottom:0.8rem;">
-        Enter coordinates (WGS84) or pick a preset to query all model layers at that point.
-    </p>
-    """, unsafe_allow_html=True)
+    section("Location hazard inspector",
+            "Enter coordinates (WGS84) or pick a preset to query all model layers at that point.")
 
-    # Preset buttons
-    st.markdown("""
-    <div style="color:#94a3b8; font-size:0.78rem; font-weight:600;
-                text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.3rem;">
-        Quick Presets
-    </div>
-    """, unsafe_allow_html=True)
-
-    preset_cols = st.columns(len(PRESET_LOCATIONS))
+    label("Quick presets")
     selected_preset = None
-    for i, (name, (plat, plon)) in enumerate(PRESET_LOCATIONS.items()):
-        if preset_cols[i].button(name, key=f"preset_{i}", use_container_width=True):
-            selected_preset = (plat, plon, name)
+    with st.container(horizontal=True, gap="small"):
+        for i, (name, (plat, plon)) in enumerate(PRESET_LOCATIONS.items()):
+            if st.button(name, key=f"preset_{i}"):
+                selected_preset = (plat, plon, name)
+                # Show the preset in the inputs below (they are keyed, so their
+                # value= default only applies on first render).
+                st.session_state["query_lat"] = plat
+                st.session_state["query_lon"] = plon
 
-    st.markdown("<div style='height:0.4rem;'></div>", unsafe_allow_html=True)
-
-    q_c1, q_c2, q_c3 = st.columns([1, 1, 1])
+    q_c1, q_c2, q_c3 = st.columns([1, 1, 1], vertical_alignment="bottom")
     default_lat = selected_preset[0] if selected_preset else 6.4550
     default_lon = selected_preset[1] if selected_preset else 3.4000
 
@@ -813,8 +975,7 @@ with tab_query:
                               min_value=2.7, max_value=4.4, step=0.001,
                               key="query_lon")
     with q_c3:
-        st.markdown("<div style='height:1.7rem;'></div>", unsafe_allow_html=True)
-        run_query = st.button("🔍  Query Location", use_container_width=True,
+        run_query = st.button("Query location", type="primary", width="stretch",
                               key="run_query")
 
     if run_query or selected_preset:
@@ -827,171 +988,127 @@ with tab_query:
         if r.get("hazard_zone") is not None:
             zone_idx = r["hazard_zone"]
             zone_name = r.get("hazard_zone_name", "Unknown")
-            zone_color = ZONE_HEX.get(zone_idx, "#64748b")
+            zone_color = ZONE_HEX.get(zone_idx, NEUTRAL_BAR)
+            zone_ink = ZONE_INK.get(zone_idx, "#ffffff")
 
-            # Header card
             loc_label = selected_preset[2] if selected_preset else f"{query_lat:.4f}°N, {query_lon:.4f}°E"
+            lga_part = f" &nbsp;·&nbsp; LGA: {r.get('lga')}" if r.get("lga") else ""
             st.markdown(f"""
-            <div style="background:linear-gradient(135deg,rgba(15,23,42,0.9),rgba(30,41,59,0.7));
-                        border:1px solid rgba(100,116,139,0.15); border-radius:14px;
-                        padding:1rem 1.4rem; margin:0.5rem 0 0.8rem 0;">
-                <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <div style="width:48px; height:48px; border-radius:12px;
-                                background:{zone_color}; display:flex;
-                                align-items:center; justify-content:center;
-                                font-size:1.2rem; font-weight:800; color:white;">
-                        {zone_idx}
-                    </div>
-                    <div>
-                        <div style="color:#e2e8f0; font-size:1.15rem; font-weight:700;">
-                            {zone_name} Hazard Zone
-                        </div>
-                        <div style="color:#64748b; font-size:0.82rem;">
-                            📍 {loc_label}
-                            {f" &nbsp;·&nbsp; LGA: {r.get('lga', 'N/A')}" if r.get('lga') else ""}
-                        </div>
-                    </div>
+            <div class="fx-result">
+                <div class="fx-result-chip" style="background:{zone_color}; color:{zone_ink};">{zone_idx}</div>
+                <div>
+                    <div class="fx-result-title">{zone_name} hazard zone</div>
+                    <div class="fx-result-meta">{loc_label}{lga_part}</div>
                 </div>
             </div>
             """, unsafe_allow_html=True)
 
-            # Detail metrics
-            m1, m2, m3, m4, m5 = st.columns(5)
-            m1.metric("Hazard Index",
-                      _fmt(r.get("flood_hazard_index"), decimals=3))
-            m2.metric("Elevation",
-                      _fmt(r.get("elevation_m"), " m"))
-            m3.metric("Slope",
-                      _fmt(r.get("slope_deg"), "°"))
-            m4.metric("TWI",
-                      _fmt(r.get("twi"), decimals=2))
-            m5.metric("Dist. to River",
-                      _fmt(r.get("distance_to_rivers_m"), " m", decimals=0))
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("Hazard index", _fmt(r.get("flood_hazard_index"), decimals=3))
+            m2.metric("Elevation", _fmt(r.get("elevation_m"), " m"))
+            m3.metric("Slope", _fmt(r.get("slope_deg"), "°"))
+            m4.metric("TWI", _fmt(r.get("twi"), decimals=2))
+            m5, m6, m7, _ = st.columns(4)
+            m5.metric("Dist. to river", _fmt(r.get("distance_to_rivers_m"), " m", decimals=0))
+            m6.metric("Runoff depth", _fmt(r.get("runoff_depth_mm"), " mm", decimals=1))
+            m7.metric("Local Government Area", r.get("lga") or "N/A")
 
-            mc1, mc2 = st.columns(2)
-            mc1.metric("Runoff Depth",
-                       _fmt(r.get("runoff_depth_mm"), " mm", decimals=1))
-            mc2.metric("Local Government Area", r.get("lga") or "N/A")
-
-            with st.expander("📋 Raw JSON Response"):
+            with st.expander("Raw JSON response"):
                 st.json(r)
 
         else:
-            st.warning("⚠️ This location falls outside the Lagos model extent or returned "
-                       "no data. Try coordinates within Lagos State "
-                       "(Lat ≈ 6.4–6.7°N, Lon ≈ 2.7–4.4°E).")
+            callout("This location falls outside the Lagos model extent or returned no data. "
+                    "Try coordinates within Lagos State (Lat ≈ 6.4–6.7°N, Lon ≈ 2.7–4.4°E).",
+                    tone="caution")
 
 
 # ─────────────────────── TAB 4 — EXPOSURE DASHBOARD ──────────────────────────
 with tab_exposure:
-    st.markdown("""
-    <h3 style="color:#e2e8f0; font-weight:700; margin-bottom:0.3rem;">
-        Population Exposure Dashboard
-    </h3>
-    <p style="color:#64748b; font-size:0.85rem; margin-bottom:0.8rem;">
-        Baseline population exposure to flood hazard across all 20 Local Government Areas.
-        Data source: WorldPop 2020 gridded population.
-    </p>
-    """, unsafe_allow_html=True)
+    section("Population exposure",
+            "Baseline population exposure to flood hazard across all 20 Local Government Areas. "
+            "Data source: WorldPop 2020 gridded population.")
 
     baseline = get_baseline()
     df_lga = get_exposure_lga().sort_values("pct_high_very_high", ascending=False)
+    statewide_pct = 100 * baseline.get("High+VeryHigh", 0) / max(baseline.get("total", 1), 1)
 
-    # Top-line metrics
     met1, met2, met3, met4 = st.columns(4)
-    met1.metric("Total Population (Model)",
-                f"{baseline.get('total', 0):,.0f}")
-    met2.metric("High + Very High Zones",
-                f"{baseline.get('High+VeryHigh', 0):,.0f}")
-    met3.metric("% in High / Very High",
-                f"{100 * baseline.get('High+VeryHigh', 0) / max(baseline.get('total', 1), 1):.1f}%")
-    met4.metric("Most Exposed LGA",
+    met1.metric("Total population (model)", f"{baseline.get('total', 0):,.0f}")
+    met2.metric("High + Very High zones", f"{baseline.get('High+VeryHigh', 0):,.0f}")
+    met3.metric("% in High / Very High", f"{statewide_pct:.1f}%")
+    met4.metric("Most exposed LGA",
                 df_lga.iloc[0]["lga_name"] if not df_lga.empty else "N/A",
-                f"{df_lga.iloc[0]['pct_high_very_high']:.1f}% exposed" if not df_lga.empty else "")
+                f"{df_lga.iloc[0]['pct_high_very_high']:.1f}% exposed" if not df_lga.empty else None,
+                delta_color="off", delta_arrow="off")
 
-    st.markdown("<div style='height:0.5rem;'></div>", unsafe_allow_html=True)
-
-    chart_col, donut_col = st.columns([3, 1.3])
+    chart_col, zone_col = st.columns([3, 2], gap="large")
 
     with chart_col:
-        fig_bar = plot_lga_exposure_bar(df_lga)
-        st.pyplot(fig_bar, use_container_width=True)
-        plt.close(fig_bar)
+        subhead("LGA exposure ranking")
+        st.altair_chart(chart_lga_ranking(df_lga, statewide_pct), width="stretch")
+        st.caption(f"Dashed line: statewide share ({statewide_pct:.1f}%). "
+                   "Orange bars are LGAs above it.")
 
-    with donut_col:
-        fig_donut = plot_zone_donut(baseline)
-        st.pyplot(fig_donut, use_container_width=True)
-        plt.close(fig_donut)
+    with zone_col:
+        subhead("Population by hazard zone")
+        st.altair_chart(chart_zone_shares(baseline), width="stretch")
 
-    st.markdown("<div style='height:0.5rem;'></div>", unsafe_allow_html=True)
+    with st.expander("Full LGA exposure table", expanded=False):
+        st.dataframe(df_lga, width="stretch", hide_index=True)
 
-    with st.expander("📋 Full LGA Exposure Table", expanded=False):
-        st.dataframe(df_lga, use_container_width=True, hide_index=True)
-
-    # Download
     csv_bytes = df_lga.to_csv(index=False).encode("utf-8")
     st.download_button(
-        "⬇️  Download Exposure Data (CSV)", csv_bytes,
+        "Download exposure data (CSV)", csv_bytes,
         file_name="lagos_exposure_by_lga.csv", mime="text/csv",
+        icon=":material/download:",
     )
 
 
 # ─────────────────────── TAB 5 — SCENARIO SIMULATOR ──────────────────────────
 with tab_scenario:
-    st.markdown("""
-    <h3 style="color:#e2e8f0; font-weight:700; margin-bottom:0.3rem;">
-        Rainfall What-If Scenario Simulator
-    </h3>
-    <p style="color:#64748b; font-size:0.85rem; margin-bottom:0.8rem;">
-        Adjust rainfall intensity and recompute the flood hazard map and population exposure
-        in real time. Requires the <code>models/factors/</code> folder (~284 MB).
-    </p>
-    """, unsafe_allow_html=True)
+    section("Rainfall what-if scenario",
+            "Adjust rainfall intensity and recompute the flood hazard map and population exposure "
+            "in real time. Requires the <code>models/factors/</code> folder (~284 MB).")
 
     factors_available = os.path.isdir(M.FACT) and os.path.exists(
         os.path.join(M.FACT, "dem.tif"))
 
     if not factors_available:
-        st.error("⚠️ The `models/factors/` directory is missing or incomplete. "
-                 "The scenario simulator requires the full factor rasters (~284 MB). "
-                 "Copy the `factors/` folder into `models/` and restart.")
+        callout("The `models/factors/` directory is missing or incomplete. "
+                "The scenario simulator requires the full factor rasters (~284 MB). "
+                "Copy the `factors/` folder into `models/` and restart.", tone="negative")
     else:
-        sc1, sc2 = st.columns(2)
+        mode = st.radio("Scenario input", SCENARIO_MODES, horizontal=True, key="scenario_mode")
 
-        with sc1:
-            mode = st.radio("Scenario input mode:", ["📊 Percentage change",
-                            "🌧️ NIMET return-period storm"],
-                            horizontal=True, key="scenario_mode")
+        ctl, _ = st.columns([3, 2])
+        with ctl:
+            if mode == SCENARIO_MODES[0]:
+                pct = st.slider("Rainfall change (%)", min_value=-50, max_value=100,
+                                value=30, step=5, key="rain_pct")
+                scale = 1 + pct / 100
+                st.markdown(f"""
+                <div class="fx-readout">
+                    Rainfall multiplier <strong>×{scale:.2f}</strong>
+                    &nbsp;({'increase' if pct > 0 else 'decrease' if pct < 0 else 'baseline'})
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                T = st.select_slider("Return period (years)",
+                                     options=[2, 5, 10, 25, 50, 100], value=100,
+                                     key="return_period_slider")
+                design = M.design_rainfall(T)
+                scale = design / 1822.0
+                st.markdown(f"""
+                <div class="fx-readout">
+                    {T}-year design rainfall ≈ <strong>{design:,.0f} mm</strong>
+                    → ×{scale:.2f} of the 1,822 mm annual mean
+                </div>
+                """, unsafe_allow_html=True)
 
-        with sc2:
-            st.markdown("")  # spacer
+            run = st.button("Run scenario", type="primary", key="run_scenario",
+                            icon=":material/play_arrow:")
 
-        if "📊" in mode:
-            pct = st.slider("Rainfall change (%)", min_value=-50, max_value=100,
-                            value=30, step=5, key="rain_pct")
-            scale = 1 + pct / 100
-            st.markdown(f"""
-            <div style="color:#94a3b8; font-size:0.85rem;">
-                Rainfall multiplier: <strong style="color:#06b6d4;">×{scale:.2f}</strong>
-                &nbsp;({'increase' if pct > 0 else 'decrease' if pct < 0 else 'baseline'})
-            </div>
-            """, unsafe_allow_html=True)
-        else:
-            T = st.select_slider("Return period (years)",
-                                 options=[2, 5, 10, 25, 50, 100], value=100,
-                                 key="return_period_slider")
-            design = M.design_rainfall(T)
-            scale = design / 1822.0
-            st.markdown(f"""
-            <div style="color:#94a3b8; font-size:0.85rem;">
-                {T}-year design rainfall ≈ <strong style="color:#a855f7;">
-                {design:,.0f} mm</strong> → ×{scale:.2f} of the 1,822 mm annual mean
-            </div>
-            """, unsafe_allow_html=True)
-
-        st.markdown("<div style='height:0.3rem;'></div>", unsafe_allow_html=True)
-
-        if st.button("🚀  Run Scenario", use_container_width=False, key="run_scenario"):
+        if run:
             baseline_exp = get_baseline()
 
             with st.spinner("Recomputing hazard index + exposure (first run may take a moment)..."):
@@ -1000,125 +1117,90 @@ with tab_scenario:
 
             hv = exp["High+VeryHigh"]
 
-            # Result metrics
+            subhead(f"Result — rainfall ×{scale:.2f}")
             r1, r2, r3 = st.columns(3)
-            r1.metric("High + Very High (Projected)",
+            # More people in High/Very High is the bad direction, so an increase shows red.
+            r1.metric("High + Very High (projected)",
                       f"{hv['people']:,.0f}",
-                      f"{hv['delta']:+,.0f} people")
-            r2.metric("Change (%)",
-                      f"{hv['pct_change']:+.2f}%")
-            r3.metric("Rainfall Scale",
-                      f"×{scale:.2f}")
+                      f"{hv['delta']:+,.0f} people", delta_color="inverse")
+            r2.metric("Change (%)", f"{hv['pct_change']:+.2f}%")
+            r3.metric("Rainfall scale", f"×{scale:.2f}")
 
-            st.markdown("<div style='height:0.4rem;'></div>", unsafe_allow_html=True)
+            # Lagos is a ~5:1 strip, so the map gets the full width to be legible.
+            label("Recomputed hazard zones")
+            st.image(scenario_zones_image(zones, ref), width="stretch")
+            zone_chips()
 
-            map_c, chart_c = st.columns([1.2, 1])
-
-            with map_c:
-                fig_zones = plot_scenario_zones(
-                    zones[::4, ::4],
-                    f"Hazard Zones — Rainfall ×{scale:.2f}")
-                st.pyplot(fig_zones, use_container_width=True)
-                plt.close(fig_zones)
+            chart_c, table_c = st.columns(2, gap="large")
 
             with chart_c:
-                fig_comp = plot_scenario_comparison(baseline_exp, exp)
-                st.pyplot(fig_comp, use_container_width=True)
-                plt.close(fig_comp)
+                label("Change by zone")
+                st.altair_chart(chart_scenario_change(exp), width="stretch")
 
-            st.markdown("""
-            <div style="background:linear-gradient(135deg,rgba(245,158,11,0.06),rgba(239,68,68,0.06));
-                        border:1px solid rgba(245,158,11,0.2); border-radius:8px;
-                        padding:0.55rem 1rem; margin:0.6rem 0;">
-                <span style="color:#fbbf24; font-size:0.85rem;">ℹ️</span>
-                <span style="color:#94a3b8; font-size:0.8rem;">
-                    Absolute numbers are anchored to the validated baseline; the scenario applies
-                    the model's relative zone shift. Rainfall drives 0.20 of the 1.0 index weight,
-                    so effects are modest — Lagos hazard is topography-dominated.
-                </span>
-            </div>
-            """, unsafe_allow_html=True)
+            with table_c:
+                label("People per zone")
+                st.dataframe(
+                    pd.DataFrame([{
+                        "Zone": n,
+                        "Baseline": round(baseline_exp.get(n, 0)),
+                        "Scenario": round(exp[n]["people"]),
+                        "Change": round(exp[n]["delta"]),
+                    } for n in M.ZONE_NAMES.values()]),
+                    width="stretch", hide_index=True,
+                    column_config={c: st.column_config.NumberColumn(format="localized")
+                                   for c in ("Baseline", "Scenario", "Change")},
+                )
 
-            # Downloads
-            st.markdown("<div style='height:0.4rem;'></div>", unsafe_allow_html=True)
-            dl1, dl2 = st.columns(2)
+            callout("Absolute numbers are anchored to the validated baseline; the scenario applies "
+                    "the model's relative zone shift. Rainfall drives 0.20 of the 1.0 index weight, "
+                    "so effects are modest — Lagos hazard is topography-dominated.")
+
+            dl1, dl2, _ = st.columns([1, 1, 1])
 
             with dl1:
                 st.download_button(
-                    "⬇️  Download Scenario Exposure (CSV)",
+                    "Scenario exposure (CSV)",
                     _exposure_csv(exp),
                     file_name=f"scenario_exposure_x{scale:.2f}.csv",
-                    mime="text/csv",
+                    mime="text/csv", icon=":material/download:", width="stretch",
                 )
 
             with dl2:
                 tiff_bytes = _zones_geotiff(zones, ref)
                 st.download_button(
-                    "⬇️  Download Scenario Zones (GeoTIFF)",
+                    "Scenario zones (GeoTIFF)",
                     tiff_bytes,
                     file_name=f"scenario_zones_x{scale:.2f}.tif",
-                    mime="image/tiff",
+                    mime="image/tiff", icon=":material/download:", width="stretch",
                 )
 
 
 # ─────────────────────── TAB 6 — CLIMATE CENTER ──────────────────────────────
 with tab_climate:
-    st.markdown("""
-    <h3 style="color:#e2e8f0; font-weight:700; margin-bottom:0.3rem;">
-        Climate Analysis &amp; Trend Center
-    </h3>
-    <p style="color:#64748b; font-size:0.85rem; margin-bottom:0.8rem;">
-        30-year analysis of NiMet Ikeja station data (1996–2025): rainfall trends,
-        temperature, humidity, and Gumbel return-period estimates.
-    </p>
-    """, unsafe_allow_html=True)
+    section("Climate analysis & trends",
+            "30-year analysis of NiMet Ikeja station data (1996–2025): rainfall trends, "
+            "temperature, humidity, and Gumbel return-period estimates.")
 
-    # Return-period calculator
-    calc1, calc2 = st.columns(2)
+    calc1, calc2 = st.columns(2, gap="large")
 
     with calc1:
-        st.markdown("""
-        <div style="background:linear-gradient(145deg,rgba(15,23,42,0.8),rgba(30,41,59,0.6));
-                    border:1px solid rgba(100,116,139,0.15); border-radius:14px;
-                    padding:1rem 1.2rem;">
-            <div style="color:#06b6d4; font-weight:700; font-size:0.78rem;
-                        text-transform:uppercase; letter-spacing:0.06em; margin-bottom:0.5rem;">
-                Return Period → Design Rainfall
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        label("Return period → design rainfall")
         T_input = st.number_input("Return period (years)", min_value=2,
                                   max_value=1000, value=100, step=1,
                                   key="calc_T")
         dr = M.design_rainfall(T_input)
-        st.metric("Design Rainfall", f"{dr:,.0f} mm")
+        st.metric("Design rainfall", f"{dr:,.0f} mm")
 
     with calc2:
-        st.markdown("""
-        <div style="background:linear-gradient(145deg,rgba(15,23,42,0.8),rgba(30,41,59,0.6));
-                    border:1px solid rgba(100,116,139,0.15); border-radius:14px;
-                    padding:1rem 1.2rem;">
-            <div style="color:#a855f7; font-weight:700; font-size:0.78rem;
-                        text-transform:uppercase; letter-spacing:0.06em; margin-bottom:0.5rem;">
-                Observed Rainfall → Return Period
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        label("Observed rainfall → return period")
         rain_input = st.number_input("Annual rainfall (mm)", min_value=500,
                                      max_value=6000, value=3932, step=50,
                                      key="calc_rain")
         rp = M.return_period(rain_input)
         rp_label = f"{rp:,.0f} years" if rp < 10000 else "> 10,000 years"
-        st.metric("Return Period", rp_label)
+        st.metric("Return period", rp_label)
 
-    st.divider()
-
-    # NIMET charts
-    st.markdown("""
-    <div style="color:#e2e8f0; font-weight:700; font-size:1.05rem; margin-bottom:0.6rem;">
-        📈 NIMET Climate Charts
-    </div>
-    """, unsafe_allow_html=True)
+    subhead("NIMET climate charts")
 
     chart_files = [
         ("fig_nimet_climatology.png", "Monthly Climatology",
@@ -1134,7 +1216,7 @@ with tab_climate:
     ]
 
     for i in range(0, len(chart_files), 2):
-        cols = st.columns(2)
+        cols = st.columns(2, gap="large")
         for j, col in enumerate(cols):
             idx = i + j
             if idx < len(chart_files):
@@ -1143,49 +1225,45 @@ with tab_climate:
                 with col:
                     if os.path.exists(fpath):
                         st.markdown(f"""
-                        <div style="color:#e2e8f0; font-weight:600; font-size:0.9rem;
-                                    margin-bottom:0.2rem;">{title}</div>
-                        <div style="color:#64748b; font-size:0.78rem;
-                                    margin-bottom:0.4rem;">{desc}</div>
+                        <div class="fx-fig-title">Figure {idx + 1}. {title}</div>
+                        <div class="fx-fig-desc">{desc}</div>
                         """, unsafe_allow_html=True)
-                        st.image(fpath, use_container_width=True)
+                        st.image(fpath, width="stretch")
                     else:
-                        st.info(f"Chart not found: {fname}")
+                        st.caption(f"Chart not found: {fname}")
 
-    st.divider()
-
-    # Climatology table
-    with st.expander("📋 Monthly Climatology Table", expanded=False):
+    st.write("")
+    with st.expander("Monthly climatology table", expanded=False):
         clim = get_climatology()
-        st.dataframe(clim, use_container_width=True, hide_index=True)
+        st.dataframe(clim, width="stretch", hide_index=True)
 
     csv_clim = get_climatology().to_csv(index=False).encode("utf-8")
     st.download_button(
-        "⬇️  Download Climatology Data (CSV)", csv_clim,
+        "Download climatology data (CSV)", csv_clim,
         file_name="nimet_climatology_1996_2025.csv", mime="text/csv",
+        icon=":material/download:",
     )
 
 # ─────────────────────── TAB 7 — SWAT+ HYDROLOGY ─────────────────────────────
 with tab_hydro:
-    st.markdown("## 🌊 Ogun River Hydrology — SWAT+ Model")
-    st.markdown(
-        "A **calibrated, process-based SWAT+ model** of the **Ogun River catchment** "
-        "(~19,915 km²) — the largest fluvial input to the Lagos Lagoon. Where the statewide "
-        "hazard map is a multi-criteria *susceptibility* index, this simulates the actual "
-        "**rainfall → runoff → streamflow** process, day by day, across 23 subbasins."
-    )
+    section("Ogun River hydrology — SWAT+ model",
+            "A <strong>calibrated, process-based SWAT+ model</strong> of the <strong>Ogun River "
+            "catchment</strong> (~19,915 km²), the largest fluvial input to the Lagos Lagoon. Where "
+            "the statewide hazard map is a multi-criteria <em>susceptibility</em> index, this "
+            "simulates the actual <strong>rainfall → runoff → streamflow</strong> process, day by "
+            "day, across 23 subbasins.")
     if not M.swat_available():
-        st.info("SWAT+ results not bundled. Build the model per `swat/METHODOLOGY_LOG.md`.")
+        st.caption("SWAT+ results not bundled. Build the model per `swat/METHODOLOGY_LOG.md`.")
     else:
         cal = M.swat_calibration()
-        st.markdown("### ✅ Calibration performance")
+        subhead("Calibration performance")
         c1, c2, c3 = st.columns(3)
         # Three decimals, not two: NSE clears its threshold by 0.007 and R² by
         # 0.006. Rounding to 0.51 / 0.61 hides how narrow that is, and the report
         # states the margins explicitly.
-        c1.metric("NSE", f"{cal['nse']:.3f}", "target ≥ 0.50")
-        c2.metric("R²", f"{cal['r2']:.3f}", "target ≥ 0.60")
-        c3.metric("PBIAS", f"{cal['pbias']:+.1f}%", "target ±25%")
+        c1.metric("NSE", f"{cal['nse']:.3f}", "target ≥ 0.50", delta_color="off", delta_arrow="off")
+        c2.metric("R²", f"{cal['r2']:.3f}", "target ≥ 0.60", delta_color="off", delta_arrow="off")
+        c3.metric("PBIAS", f"{cal['pbias']:+.1f}%", "target ±25%", delta_color="off", delta_arrow="off")
         st.caption(
             f"Monthly discharge vs GEOGLOWS at the Ogun outlet ({cal['period']}). "
             f"Independent validation 2018–2023: NSE {cal['validation_2018_2023']['nse']:.2f}, "
@@ -1193,18 +1271,15 @@ with tab_hydro:
             "model generalises rather than overfitting."
         )
 
-        st.markdown("### 📈 Monthly discharge — observed vs simulated")
+        subhead("Monthly discharge — observed vs simulated")
         _hy = M.swat_hydrograph()
-        _mo = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-               "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-        _dfh = pd.DataFrame({
+        st.altair_chart(chart_monthly({
             "Observed (GEOGLOWS)": [h["obs"] for h in _hy],
             "Simulated (SWAT+)": [h["sim"] for h in _hy],
-        }, index=_mo)
-        st.line_chart(_dfh, height=320)
+        }, "Discharge (m³/s)"), width="stretch")
         st.caption("Mean monthly outlet discharge (m³/s). The Sept–Oct peak matches the Lagos flood season.")
 
-        st.markdown("### 🌧️ Rainfall scenarios (process-based)")
+        subhead("Rainfall scenarios (process-based)")
         _sc = M.swat_scenarios()
         _dfs = pd.DataFrame(_sc)
         st.dataframe(
@@ -1212,9 +1287,9 @@ with tab_hydro:
                                  "peak": "Peak month (m³/s)", "d_mean": "Δ mean %",
                                  "d_peak": "Δ peak %"})[
                 ["Scenario", "Mean flow (m³/s)", "Peak month (m³/s)", "Δ mean %", "Δ peak %"]],
-            use_container_width=True, hide_index=True,
+            width="stretch", hide_index=True,
         )
-        st.bar_chart(_dfs.set_index("label")[["mean", "peak"]], height=280)
+        st.altair_chart(chart_swat_scenarios(_sc), width="stretch")
         st.caption(
             "A **+10% rainfall increase drives ~+15% mean flow** — the nonlinear rainfall–runoff "
             "amplification a process model captures, unlike a linear index."
@@ -1226,7 +1301,7 @@ with tab_hydro:
             f"**Extreme historical (wettest simulated year): {_ex['year']}** — "
             f"annual mean {_ex['annual_mean']} m³/s, peak month {_ex['peak_month']} m³/s."
         )
-        st.warning("⚠️ " + _s["note_2022"])
+        callout(_s["note_2022"], tone="caution")
         st.caption(
             "Calibrated against GEOGLOWS modelled discharge (a recognised data-scarce approach). "
             "Oyan Dam regulation is not modelled — a documented limitation. "
@@ -1236,15 +1311,13 @@ with tab_hydro:
 
 # ─────────────────────── TAB 8 — INDEPENDENT VALIDATION ──────────────────────
 with tab_valid:
-    st.markdown("## ✅ Independent Validation")
-    st.markdown(
-        "Checks the model was **not** tuned to. The SWAT+ parameters were fitted to "
-        "discharge alone and the AHP map was built from expert weights, so everything "
-        "below is an out-of-sample test. Results are mixed — they are reported as found."
-    )
+    section("Independent validation",
+            "Checks the model was <strong>not</strong> tuned to. The SWAT+ parameters were fitted to "
+            "discharge alone and the AHP map was built from expert weights, so everything "
+            "below is an out-of-sample test. Results are mixed — they are reported as found.")
 
     if not M.validation_available():
-        st.info("Validation results not bundled. Run `validation/build_validation_bundle.py`.")
+        st.caption("Validation results not bundled. Run `validation/build_validation_bundle.py`.")
     else:
         _v = M.validation_summary()
         _et = M.et_validation()
@@ -1253,36 +1326,32 @@ with tab_valid:
         _b = _sp["test_b_lga_level"]
 
         # ── 1. ET check ──────────────────────────────────────────────────────
-        st.markdown("### 1 · Evapotranspiration — a second variable, never calibrated to")
+        subhead("1 · Evapotranspiration — a second variable, never calibrated to")
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Monthly NSE", f"{_et['monthly']['nse']:.2f}")
         c2.metric("Monthly R²", f"{_et['monthly']['r2']:.2f}")
         c3.metric("PBIAS", f"{_et['monthly']['pbias']:+.1f}%",
                   help="Within the ±25% Moriasi band")
         c4.metric("Annual ET", f"{_et['annual_mm']['swat']:.0f} mm",
-                  delta=f"{_et['annual_mm']['swat'] - _et['annual_mm']['reference']:+.0f} vs ref")
+                  delta=f"{_et['annual_mm']['swat'] - _et['annual_mm']['reference']:+.0f} vs ref",
+                  delta_color="off")
 
         _c = _et["climatology"]
-        st.line_chart(
-            pd.DataFrame(
-                {"Reference ET": _c["ref_mm"], "SWAT+ simulated ET": _c["sim_mm"]},
-                # zero-padded so Streamlit's alphabetical index sort stays chronological
-                index=[f"{m:02d} {calendar.month_abbr[m]}" for m in range(1, 13)],
-            ),
-            height=260,
-        )
+        st.altair_chart(chart_monthly({
+            "Reference ET": _c["ref_mm"],
+            "SWAT+ simulated ET": _c["sim_mm"],
+        }, "ET (mm/month)"), width="stretch")
         st.markdown(
             f"**Verdict — {_v['honest_status']['et_independent_check']}**"
         )
         _alt = M.et_validation_corroborating()
         if _alt:
-            st.success(
-                "✅ **Two independent references agree.** MODIS MOD16 "
+            callout(
+                "**Two independent references agree.** MODIS MOD16 "
                 f"({_et['annual_mm']['reference']:.0f} mm/yr) and TerraClimate "
                 f"({_alt['annual_mm']['reference']:.0f} mm/yr) were tested separately "
                 "and show the same damped seasonal cycle. The finding is robust, not "
-                "an artefact of one product."
-            )
+                "an artefact of one product.", tone="positive")
         st.caption(
             f"Primary reference: {_et['reference_product']} — a true satellite ET "
             "retrieval, the product specified for this validation. Regenerate with "
@@ -1291,7 +1360,7 @@ with tab_valid:
         )
 
         # ── 2. Calibration trade-off ─────────────────────────────────────────
-        st.markdown("### 2 · Why the parameters were not re-tuned to ET")
+        subhead("2 · Why the parameters were not re-tuned to ET")
         _t = M.calibration_tradeoff()
         st.dataframe(
             pd.DataFrame([{
@@ -1301,14 +1370,14 @@ with tab_valid:
                 "Discharge PBIAS %": r["discharge"]["pbias"],
                 "ET NSE": r["et"]["nse"],
                 "ET PBIAS %": r["et"]["pbias"],
-                "Meets thresholds": "✅" if r["discharge_passes"] else "❌",
+                "Meets thresholds": "Yes" if r["discharge_passes"] else "No",
             } for r in _t["runs"]]),
-            use_container_width=True, hide_index=True,
+            width="stretch", hide_index=True,
         )
-        st.info("🔍 " + _t["diagnosis"])
+        callout(_t["diagnosis"])
 
         # ── 3. Hazard map vs observed floods ─────────────────────────────────
-        st.markdown("### 3 · Hazard map vs observed floods")
+        subhead("3 · Hazard map vs observed floods")
         c1, c2, c3 = st.columns(3)
         c1.metric("AUC-ROC", f"{_a['auc_roc']:.2f}",
                   help="0.5 = no skill, 1.0 = perfect")
@@ -1323,7 +1392,7 @@ with tab_valid:
                 "% of Lagos": _a["zones"][z]["pct_of_lagos"],
                 "Enrichment": _a["zones"][z]["enrichment"],
             } for z in ("Very Low", "Low", "Moderate", "High", "Very High")]),
-            use_container_width=True, hide_index=True,
+            width="stretch", hide_index=True,
         )
         st.markdown(
             "Enrichment climbs monotonically across the zones — the map **ranks** "
@@ -1331,16 +1400,15 @@ with tab_valid:
         )
 
         # ── 4. The negative result ───────────────────────────────────────────
-        st.markdown("### 4 · LGA-level check — an inconclusive result")
+        subhead("4 · LGA-level check — an inconclusive result")
         c1, c2, c3 = st.columns(3)
         c1.metric("ρ vs modelled exposure", f"{_b['spearman_rho']:+.2f}")
         c2.metric("ρ vs absolute exposed", f"{_b['spearman_rho_vs_absolute_exposed']:+.2f}")
         c3.metric("ρ vs raw population", f"{_b['spearman_rho_vs_population']:+.2f}")
-        st.warning(
-            "⚠️ NEMA flood-report counts track **raw population** far better than "
+        callout(
+            "NEMA flood-report counts track **raw population** far better than "
             "modelled exposure. Reporting effort — not flood hazard — dominates this "
-            "dataset, so it cannot validate the map. Reported as a null result."
-        )
+            "dataset, so it cannot validate the map. Reported as a null result.", tone="caution")
         st.dataframe(
             pd.DataFrame(_b["per_lga"]).rename(columns={
                 "lga": "LGA", "nema_reports": "NEMA reports",
@@ -1348,12 +1416,40 @@ with tab_valid:
                 "population": "Population",
                 "model_people_high_vh": "People exposed",
             }),
-            use_container_width=True, hide_index=True, height=320,
+            width="stretch", hide_index=True, height=320,
         )
 
-        st.error("🚫 **Not claimed:** " + _v["honest_status"]["not_claimed"])
+        callout("**Not claimed:** " + _v["honest_status"]["not_claimed"], tone="negative")
         st.caption(
             "Sources: MODIS 250 m flood extent Jul–Nov 2012 (NASA/DFO via HDX); "
             "NEMA 2022 Lagos flood records (62 reports, via HDX). "
             "Method and caveats: `validation/spatial_validation.py`."
         )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TAB SWITCH SCROLL
+# ═══════════════════════════════════════════════════════════════════════════════
+# With the tab bar pinned (phones), switching tabs while scrolled down would open
+# the new tab part-way through its content. Bring its top back under the bar.
+st.html("""
+<script>
+(() => {
+    if (window.__fxTabScroll) { return; }
+    window.__fxTabScroll = true;
+    document.addEventListener("click", (event) => {
+        const tab = event.target.closest('.stTabs [data-baseweb="tab"]');
+        if (!tab) { return; }
+        requestAnimationFrame(() => {
+            const tabs = tab.closest(".stTabs");
+            const main = document.querySelector('[data-testid="stMain"]');
+            const header = document.querySelector('header[data-testid="stHeader"]');
+            if (!tabs || !main) { return; }
+            const headerHeight = header ? header.getBoundingClientRect().height : 0;
+            const offset = tabs.getBoundingClientRect().top - headerHeight;
+            if (offset < 0) { main.scrollBy({top: offset}); }
+        });
+    });
+})();
+</script>
+""", unsafe_allow_javascript=True)

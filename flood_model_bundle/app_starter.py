@@ -60,7 +60,7 @@ with tab3:
 
 with tab4:
     st.subheader("Rainfall what-if scenario")
-    mode = st.radio("Scenario by:", ["% change", "NIMET return-period storm"])
+    mode = st.radio("Scenario by:", ["% change", "NIMET return-period wet year"])
     if mode == "% change":
         pct = st.slider("Rainfall change (%)", -50, 100, 30, step=10)
         scale = 1 + pct / 100

@@ -1,10 +1,44 @@
+# Shared by both themes. Viewers pick System / Light / Dark from the top-right
+# menu; app.py reads the active one via st.context.theme and CSS light-dark().
 [theme]
-base = "dark"
-primaryColor = "#06b6d4"
-backgroundColor = "#0f172a"
-secondaryBackgroundColor = "#1e293b"
-textColor = "#e2e8f0"
-font = "sans serif"
+font = "IBM Plex Sans:https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap, sans-serif"
+headingFont = "Source Serif 4:https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@500;600&display=swap, serif"
+codeFont = "IBM Plex Mono:https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap, monospace"
+baseRadius = "small"
+buttonRadius = "small"
+showWidgetBorder = true
+# Chart colours can only be set here, not per light/dark section, so these are
+# mid-tones that read on both backgrounds.
+chartCategoricalColors = ["#3a87c8", "#c96a3d", "#5e9a59", "#8f74bf", "#7d848b"]
+
+[theme.light]
+primaryColor = "#1d5689"
+backgroundColor = "#f6f5f1"
+secondaryBackgroundColor = "#ebe8e1"
+textColor = "#1c1f23"
+borderColor = "#d5d1c7"
+linkColor = "#1d5689"
+dataframeHeaderBackgroundColor = "#ebe8e1"
+
+[theme.light.sidebar]
+backgroundColor = "#eeebe4"
+
+[theme.dark]
+primaryColor = "#86b6e0"
+backgroundColor = "#141618"
+secondaryBackgroundColor = "#1f2225"
+textColor = "#e3e1db"
+borderColor = "#34383c"
+linkColor = "#86b6e0"
+dataframeHeaderBackgroundColor = "#1f2225"
+
+[theme.dark.sidebar]
+backgroundColor = "#191b1e"
+
+# "viewer" keeps the menu (with the theme switch) but hides developer options;
+# "minimal" would hide the whole menu.
+[client]
+toolbarMode = "viewer"
 
 [server]
 headless = true

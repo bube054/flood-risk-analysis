@@ -88,7 +88,7 @@ exp["High+VeryHigh"]              # -> {'people': 4827500, 'delta': +17431, 'pct
 1. **Hazard map** — show `flood_hazard_zones.tif` colored by 5 zones + LGA outlines.
 2. **Point query** — type/click a location → hazard zone, elevation, runoff, distance to river, LGA.
 3. **Exposure dashboard** — rank 20 LGAs by % exposed; statewide totals (4.81 M in High/Very High).
-4. **Rainfall scenario** — slider or NIMET return-period storm → recompute map + projected exposure.
+4. **Rainfall scenario** — slider or NIMET return-period wet year (annual total) → recompute map + projected exposure.
 5. **Climate panel** — show the 5 `fig_nimet_*.png` charts + a return-period calculator.
 
 ---

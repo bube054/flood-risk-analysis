@@ -27,7 +27,7 @@ Planned features (each maps to functions in `model_api.py` — all data is prese
    river, runoff, and which LGA. → `point_query(lat, lon)`.
 3. **Exposure dashboard** — rank all 20 LGAs by % population in High/Very High zones; statewide
    totals. → `exposure_by_lga()`, `real_baseline_exposure()`.
-4. **Rainfall what-if scenario** — slider (% change) or a NIMET return-period storm (2/5/10/25/50/100-yr)
+4. **Rainfall what-if scenario** — slider (% change) or a NIMET return-period wet year, i.e. annual total (2/5/10/25/50/100-yr)
    → recompute the hazard map + projected exposure. → `scenario_exposure(scale)`, `recompute_hazard(scale)`,
    `design_rainfall(years)`.
 5. **Climate panel** — show the 5 `fig_nimet_*.png` charts + a return-period calculator
