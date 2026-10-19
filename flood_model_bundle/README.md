@@ -14,7 +14,9 @@ All models are already trained/produced; this bundle wraps them behind one Pytho
 ```
 flood_model_bundle/
 ├── model_api.py          ← THE API. Import this; call its functions.
+├── app.py                ← The full portal (streamlit run app.py).
 ├── app_starter.py        ← Minimal Streamlit demo (run it, then extend).
+├── fetch_factors.py      ← Downloads models/factors/ on a fresh install.
 ├── requirements.txt
 ├── README.md             ← this file
 └── models/
@@ -29,7 +31,9 @@ flood_model_bundle/
     │   ├── nimet_climatology.csv       30-yr monthly climate
     │   ├── nimet_annual_series.csv     annual rainfall/temp/humidity series
     │   └── fig_nimet_*.png             5 ready-made NIMET charts
-    └── factors/          (~284 MB) — only needed for the RAINFALL SCENARIO tab
+    ├── factors_manifest.json           where factors/ is published, with sizes + SHA-256
+    └── factors/          (~284 MB) — needed for the RAINFALL SCENARIO and the POINT QUERY
+                                        terrain values; not in git (see below)
         ├── dem.tif, slope.tif, twi.tif, distance_to_rivers.tif,
         │   flow_accumulation.tif, lulc_10m.tif      (static conditioning factors)
         ├── curve_number.tif, rainfall_total_2021.tif, rainfall_95pct.tif,
@@ -37,8 +41,13 @@ flood_model_bundle/
         └── worldpop.tif                              (population, for scenario exposure)
 ```
 
-If you only want the display features, you can copy **just `models/core/`** (29 MB) and skip
-the 284 MB `factors/` folder. The scenario tab needs `factors/`.
+`factors/` is kept out of git and published as the assets of the GitHub release
+[`factors-v1`](https://github.com/bube054/flood-risk-analysis/releases/tag/factors-v1)
+(~158 MB: the same rasters losslessly recompressed with DEFLATE, pixel values identical).
+`python fetch_factors.py` downloads it and checks every file against
+`models/factors_manifest.json`; `app.py` does the same in the background on first start.
+Without it, the scenario tab cannot run and point query shows N/A for elevation, slope,
+TWI, distance to river and runoff.
 
 ---
 
@@ -103,8 +112,11 @@ exp["High+VeryHigh"]              # -> {'people': 4827500, 'delta': +17431, 'pct
 - **Why rainfall effects look modest:** rainfall drives only the runoff + extreme-rainfall
   factors (0.20 of the 1.0 index weight); elevation + TWI dominate (0.38). Lagos flood hazard is
   topography-structured — the model correctly reflects that.
-- **Deployment:** for a public host (Streamlit Cloud / Render), the 284 MB `factors/` folder is
-  large — either deploy display-only (core, 29 MB) or use Git LFS / external storage for factors.
+- **Deployment (Streamlit Community Cloud):** deploy from GitHub with main file
+  `flood_model_bundle/app.py` and Python 3.12 (the version `requirements.txt` is pinned and
+  tested for). The app fetches `factors/` from the `factors-v1` release on first start, so a
+  fresh server needs no extra setup. If the rasters ever change, upload them as a new release
+  and regenerate `models/factors_manifest.json`.
 - **Not in this bundle:** the trained Random Forest LULC classifier object (only its output
   raster is here). Serving live pixel classification would need the model re-saved from
   `lulc_classification.py`.

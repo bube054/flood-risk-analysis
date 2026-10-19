@@ -11,10 +11,11 @@ env/
 .streamlit/secrets.toml
 
 # ── Large model rasters (~284 MB) ────────────────────────────────────────
-# Kept on disk, deliberately out of git: three files are ~70 MB each and this
-# repo has no remote, so versioning them costs disk without buying a backup.
-# Needed only for the rainfall-scenario tab — see flood_model_bundle/README.md §1.
-# Back these up separately (external drive / cloud), not via git.
+# Deliberately out of git (three files are ~70 MB each). They are published as
+# the assets of the GitHub release factors-v1; fetch_factors.py downloads them
+# and verifies them against models/factors_manifest.json, which IS tracked.
+# Needed for the rainfall scenario and the point-query terrain values — see
+# flood_model_bundle/README.md §1.
 flood_model_bundle/models/factors/
 
 # ── Node / Next.js (scaffold removed; kept for a possible future frontend) ─

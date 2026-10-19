@@ -1,0 +1,50 @@
+{
+  "release": "factors-v1",
+  "base_url": "https://github.com/bube054/flood-risk-analysis/releases/download/factors-v1/",
+  "files": {
+    "curve_number.tif": {
+      "size": 1451634,
+      "sha256": "c96810767619e77c92796b93cf72cf04a3624f112dccc8f6de3f9d69617101f9"
+    },
+    "dem.tif": {
+      "size": 10901175,
+      "sha256": "675077ebd7522e1f8e441a8b83c4843f7f86885a03cb4338661c0aedc1cecb10"
+    },
+    "distance_to_rivers.tif": {
+      "size": 16863583,
+      "sha256": "6ab1e2b9d95812f57cfe96e0bd2479f96c0ddfe10568f8fa1001a02a277a5a2f"
+    },
+    "flow_accumulation.tif": {
+      "size": 48576216,
+      "sha256": "bf233a1a267eaf6e7641c24c99e7014f16552f84749efaa33ecfa1b0a56db69c"
+    },
+    "lulc_10m.tif": {
+      "size": 6239844,
+      "sha256": "02ddded74ac2ebbd3ddcf2c5ed656ebd5c0509330419f3fab78291bc76ff99c1"
+    },
+    "rainfall_95pct.tif": {
+      "size": 2336323,
+      "sha256": "1f5884b8bc1ffb4e1667ad992efc7684722ecb66c6a611d87cfbe660c552483f"
+    },
+    "rainfall_total_2021.tif": {
+      "size": 2706998,
+      "sha256": "713e979cbaa81ccc5f3a0b108f2de1a1f97e58e0d52e0d0d941d485d3edb8e6b"
+    },
+    "runoff_depth_mm.tif": {
+      "size": 7152433,
+      "sha256": "e5eff6d7046dfbbe99f23dfcf9d2baed767a084ca7c1969460a5351e3316f7d6"
+    },
+    "slope.tif": {
+      "size": 11816455,
+      "sha256": "a5fee66468ba53574e46d3929c000945542a7d0a2c6e5d72642b0e12a80b5808"
+    },
+    "twi.tif": {
+      "size": 45686454,
+      "sha256": "e1d7133a2f8fcfb5bb8abe5ce74f3abd962ac144db058503ebf6722aafbb2c0c"
+    },
+    "worldpop.tif": {
+      "size": 4077641,
+      "sha256": "1bbb473dc6a5824ef4ccbe90915d048140b8293a889c4b853204edf9a5cc8f86"
+    }
+  }
+}

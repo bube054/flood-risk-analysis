@@ -32,6 +32,7 @@ from PIL import Image
 import streamlit as st
 from streamlit_folium import st_folium
 
+import fetch_factors as F
 import model_api as M
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -43,6 +44,10 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="auto",   # open on desktop, collapsed on phones
 )
+
+# On a fresh server models/factors/ is absent (it is not in git). Start fetching
+# it in the background now so point query and the scenario rarely have to wait.
+F.start()
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # STYLES
@@ -451,6 +456,32 @@ def callout(md, tone="info"):
     """A note with a coloured left rule. tone: info, caution, negative, positive."""
     with st.container(key=f"fx-callout-{tone}-{next(_callout_ids)}"):
         st.markdown(md)
+
+
+def wait_for_factors(purpose):
+    """Make sure the factor rasters are on disk, showing download progress the
+    first time on a fresh server. Returns False, after saying why, if they
+    could not be fetched."""
+    if not F.missing():
+        return True
+    bar = st.progress(0.0, text=f"Fetching the model rasters needed for {purpose} "
+                                "(first use on this server)…")
+
+    def show(done, total):
+        if total:
+            bar.progress(min(done / total, 1.0),
+                         text=f"Fetching the model rasters needed for {purpose} (first use on "
+                              f"this server): {done / 1e6:.0f} of {total / 1e6:.0f} MB")
+
+    try:
+        F.wait(progress=show)
+        return True
+    except RuntimeError as exc:
+        callout(f"Could not download the model rasters needed for {purpose}. "
+                f"Reload the page to retry. ({exc})", tone="negative")
+        return False
+    finally:
+        bar.empty()
 
 
 def zone_chips():
@@ -982,6 +1013,7 @@ with tab_query:
         query_lat = selected_preset[0] if selected_preset else lat
         query_lon = selected_preset[1] if selected_preset else lon
 
+        wait_for_factors("point queries")
         with st.spinner("Sampling model layers..."):
             r = M.point_query(query_lat, query_lon)
 
@@ -1068,111 +1100,107 @@ with tab_exposure:
 with tab_scenario:
     section("Rainfall what-if scenario",
             "Adjust rainfall intensity and recompute the flood hazard map and population exposure "
-            "in real time. Requires the <code>models/factors/</code> folder (~284 MB).")
+            "in real time.")
 
-    factors_available = os.path.isdir(M.FACT) and os.path.exists(
-        os.path.join(M.FACT, "dem.tif"))
+    if F.missing():
+        st.caption("This server is still fetching the model rasters (~160 MB, first start only). "
+                   "A run started now waits for them, so it may take a minute longer.")
 
-    if not factors_available:
-        callout("The `models/factors/` directory is missing or incomplete. "
-                "The scenario simulator requires the full factor rasters (~284 MB). "
-                "Copy the `factors/` folder into `models/` and restart.", tone="negative")
-    else:
-        mode = st.radio("Scenario input", SCENARIO_MODES, horizontal=True, key="scenario_mode")
+    mode = st.radio("Scenario input", SCENARIO_MODES, horizontal=True, key="scenario_mode")
 
-        ctl, _ = st.columns([3, 2])
-        with ctl:
-            if mode == SCENARIO_MODES[0]:
-                pct = st.slider("Rainfall change (%)", min_value=-50, max_value=100,
-                                value=30, step=5, key="rain_pct")
-                scale = 1 + pct / 100
-                st.markdown(f"""
-                <div class="fx-readout">
-                    Rainfall multiplier <strong>×{scale:.2f}</strong>
-                    &nbsp;({'increase' if pct > 0 else 'decrease' if pct < 0 else 'baseline'})
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                T = st.select_slider("Return period (years)",
-                                     options=[2, 5, 10, 25, 50, 100], value=100,
-                                     key="return_period_slider")
-                design = M.design_rainfall(T)
-                scale = design / 1822.0
-                st.markdown(f"""
-                <div class="fx-readout">
-                    {T}-year design rainfall ≈ <strong>{design:,.0f} mm</strong>
-                    → ×{scale:.2f} of the 1,822 mm annual mean
-                </div>
-                """, unsafe_allow_html=True)
+    ctl, _ = st.columns([3, 2])
+    with ctl:
+        if mode == SCENARIO_MODES[0]:
+            pct = st.slider("Rainfall change (%)", min_value=-50, max_value=100,
+                            value=30, step=5, key="rain_pct")
+            scale = 1 + pct / 100
+            st.markdown(f"""
+            <div class="fx-readout">
+                Rainfall multiplier <strong>×{scale:.2f}</strong>
+                &nbsp;({'increase' if pct > 0 else 'decrease' if pct < 0 else 'baseline'})
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            T = st.select_slider("Return period (years)",
+                                 options=[2, 5, 10, 25, 50, 100], value=100,
+                                 key="return_period_slider")
+            design = M.design_rainfall(T)
+            scale = design / 1822.0
+            st.markdown(f"""
+            <div class="fx-readout">
+                {T}-year design rainfall ≈ <strong>{design:,.0f} mm</strong>
+                → ×{scale:.2f} of the 1,822 mm annual mean
+            </div>
+            """, unsafe_allow_html=True)
 
-            run = st.button("Run scenario", type="primary", key="run_scenario",
-                            icon=":material/play_arrow:")
+        run = st.button("Run scenario", type="primary", key="run_scenario",
+                        icon=":material/play_arrow:")
 
-        if run:
-            baseline_exp = get_baseline()
+    if run and wait_for_factors("scenarios"):
+        baseline_exp = get_baseline()
 
-            with st.spinner("Recomputing hazard index + exposure (first run may take a moment)..."):
-                exp, zones = M.scenario_exposure(scale)
-                _, _, ref = M.recompute_hazard(scale)
+        with st.spinner("Recomputing hazard index + exposure (first run may take a moment)..."):
+            exp, zones = M.scenario_exposure(scale)
+            _, _, ref = M.recompute_hazard(scale)
 
-            hv = exp["High+VeryHigh"]
+        hv = exp["High+VeryHigh"]
 
-            subhead(f"Result — rainfall ×{scale:.2f}")
-            r1, r2, r3 = st.columns(3)
-            # More people in High/Very High is the bad direction, so an increase shows red.
-            r1.metric("High + Very High (projected)",
-                      f"{hv['people']:,.0f}",
-                      f"{hv['delta']:+,.0f} people", delta_color="inverse")
-            r2.metric("Change (%)", f"{hv['pct_change']:+.2f}%")
-            r3.metric("Rainfall scale", f"×{scale:.2f}")
+        subhead(f"Result — rainfall ×{scale:.2f}")
+        r1, r2, r3 = st.columns(3)
+        # More people in High/Very High is the bad direction, so an increase shows red.
+        r1.metric("High + Very High (projected)",
+                  f"{hv['people']:,.0f}",
+                  f"{hv['delta']:+,.0f} people", delta_color="inverse")
+        r2.metric("Change (%)", f"{hv['pct_change']:+.2f}%")
+        r3.metric("Rainfall scale", f"×{scale:.2f}")
 
-            # Lagos is a ~5:1 strip, so the map gets the full width to be legible.
-            label("Recomputed hazard zones")
-            st.image(scenario_zones_image(zones, ref), width="stretch")
-            zone_chips()
+        # Lagos is a ~5:1 strip, so the map gets the full width to be legible.
+        label("Recomputed hazard zones")
+        st.image(scenario_zones_image(zones, ref), width="stretch")
+        zone_chips()
 
-            chart_c, table_c = st.columns(2, gap="large")
+        chart_c, table_c = st.columns(2, gap="large")
 
-            with chart_c:
-                label("Change by zone")
-                st.altair_chart(chart_scenario_change(exp), width="stretch")
+        with chart_c:
+            label("Change by zone")
+            st.altair_chart(chart_scenario_change(exp), width="stretch")
 
-            with table_c:
-                label("People per zone")
-                st.dataframe(
-                    pd.DataFrame([{
-                        "Zone": n,
-                        "Baseline": round(baseline_exp.get(n, 0)),
-                        "Scenario": round(exp[n]["people"]),
-                        "Change": round(exp[n]["delta"]),
-                    } for n in M.ZONE_NAMES.values()]),
-                    width="stretch", hide_index=True,
-                    column_config={c: st.column_config.NumberColumn(format="localized")
-                                   for c in ("Baseline", "Scenario", "Change")},
-                )
+        with table_c:
+            label("People per zone")
+            st.dataframe(
+                pd.DataFrame([{
+                    "Zone": n,
+                    "Baseline": round(baseline_exp.get(n, 0)),
+                    "Scenario": round(exp[n]["people"]),
+                    "Change": round(exp[n]["delta"]),
+                } for n in M.ZONE_NAMES.values()]),
+                width="stretch", hide_index=True,
+                column_config={c: st.column_config.NumberColumn(format="localized")
+                               for c in ("Baseline", "Scenario", "Change")},
+            )
 
-            callout("Absolute numbers are anchored to the validated baseline; the scenario applies "
-                    "the model's relative zone shift. Rainfall drives 0.20 of the 1.0 index weight, "
-                    "so effects are modest — Lagos hazard is topography-dominated.")
+        callout("Absolute numbers are anchored to the validated baseline; the scenario applies "
+                "the model's relative zone shift. Rainfall drives 0.20 of the 1.0 index weight, "
+                "so effects are modest — Lagos hazard is topography-dominated.")
 
-            dl1, dl2, _ = st.columns([1, 1, 1])
+        dl1, dl2, _ = st.columns([1, 1, 1])
 
-            with dl1:
-                st.download_button(
-                    "Scenario exposure (CSV)",
-                    _exposure_csv(exp),
-                    file_name=f"scenario_exposure_x{scale:.2f}.csv",
-                    mime="text/csv", icon=":material/download:", width="stretch",
-                )
+        with dl1:
+            st.download_button(
+                "Scenario exposure (CSV)",
+                _exposure_csv(exp),
+                file_name=f"scenario_exposure_x{scale:.2f}.csv",
+                mime="text/csv", icon=":material/download:", width="stretch",
+            )
 
-            with dl2:
-                tiff_bytes = _zones_geotiff(zones, ref)
-                st.download_button(
-                    "Scenario zones (GeoTIFF)",
-                    tiff_bytes,
-                    file_name=f"scenario_zones_x{scale:.2f}.tif",
-                    mime="image/tiff", icon=":material/download:", width="stretch",
-                )
+        with dl2:
+            tiff_bytes = _zones_geotiff(zones, ref)
+            st.download_button(
+                "Scenario zones (GeoTIFF)",
+                tiff_bytes,
+                file_name=f"scenario_zones_x{scale:.2f}.tif",
+                mime="image/tiff", icon=":material/download:", width="stretch",
+            )
 
 
 # ─────────────────────── TAB 6 — CLIMATE CENTER ──────────────────────────────

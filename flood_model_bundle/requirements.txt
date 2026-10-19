@@ -1,11 +1,18 @@
-# Lagos Flood model bundle — Python deps (Python 3.10+)
-numpy>=1.24
-pandas>=2.0
-rasterio>=1.3
-geopandas>=0.14
-shapely>=2.0
-matplotlib>=3.7
-streamlit>=1.30
-folium>=0.14
-streamlit-folium>=0.15
-Pillow>=9.0
+# Lagos Flood model bundle — Python deps (Python 3.12)
+# Pinned to the versions the portal was tested with, so a fresh install
+# (e.g. Streamlit Community Cloud) gets the same behaviour. app.py needs
+# streamlit >= 1.58 for its light/dark theme config and st.html scripts.
+numpy==2.5.0
+pandas==3.0.3
+rasterio==1.5.0
+geopandas==1.1.4
+pyogrio==0.13.0
+pyproj==3.7.2
+shapely==2.1.2
+matplotlib==3.11.0
+streamlit==1.58.0
+altair==6.2.2
+folium==0.20.0
+branca==0.8.2
+streamlit-folium==0.27.2
+Pillow==12.3.0

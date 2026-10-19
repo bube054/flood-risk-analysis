@@ -67,8 +67,11 @@ Verify it works first: `python model_api.py` (prints a self-test).
 | NIMET climatology | `core/nimet_climatology.csv`, `nimet_annual_series.csv`, `fig_nimet_*.png` | `climatology` |
 | Rainfall scenario (live recompute) | `factors/*` (8 factors + CN + base rainfall + WorldPop) | `recompute_hazard`, `scenario_exposure` |
 
-`models/core/` (~29 MB) powers features 1–3 & 5. `models/factors/` (~284 MB) is **only** for the
-rainfall scenario recompute (feature 4). If deploying display-only, you can omit `factors/`.
+`models/core/` (~29 MB) powers features 1–3 & 5. `models/factors/` (~284 MB) drives the rainfall
+scenario recompute (feature 4) and the terrain values in point query (feature 2). It is not in
+git: it is published as the GitHub release `factors-v1`, and `fetch_factors.py` (called by
+`app.py` at start-up) downloads it, verifying sizes and SHA-256 from
+`models/factors_manifest.json`.
 
 ## 5. CRITICAL — honesty & framing (do not violate)
 
