@@ -12,6 +12,7 @@ Run:  streamlit run app.py
 """
 import base64
 import calendar
+import html
 import io
 import itertools
 import json
@@ -188,7 +189,7 @@ div[data-testid="stMetric"] { border-top: 1px solid var(--fx-rule); padding-top:
 
 /* ── Map frame and figure plates ── */
 .st-key-fx-map iframe { border: 1px solid var(--fx-rule); border-radius: 4px; }
-[data-testid="stImage"] img { border: 1px solid var(--fx-rule); border-radius: 4px; }
+.fx-img { display: block; width: 100%; height: auto; border: 1px solid var(--fx-rule); border-radius: 4px; }
 
 /* ── Overview: headline figures. Cells carry their own top/left rules and the
       wrapper clips the outer ones, so the strip wraps cleanly at any width. ── */
@@ -482,6 +483,29 @@ def wait_for_factors(purpose):
         return False
     finally:
         bar.empty()
+
+
+@st.cache_data(ttl=3600)
+def _png_file_b64(path):
+    with open(path, "rb") as f:
+        return base64.b64encode(f.read()).decode()
+
+
+def inline_image(image, alt):
+    """Show a PNG (a file path or a PIL image) inline as a data URI.
+
+    st.image serves pictures from the /media/ route, which returns HTTP 500 on
+    Streamlit Community Cloud with streamlit 1.58 (download buttons on the
+    same route work), so pictures bypass it. Large messages are cached by the
+    browser, so a figure is sent once per visit rather than on every rerun.
+    """
+    if isinstance(image, str):
+        b64 = _png_file_b64(image)
+    else:
+        buf = io.BytesIO()
+        image.save(buf, format="PNG", optimize=True)
+        b64 = base64.b64encode(buf.getvalue()).decode()
+    st.html(f'<img class="fx-img" src="data:image/png;base64,{b64}" alt="{html.escape(alt)}">')
 
 
 def zone_chips():
@@ -1092,7 +1116,7 @@ with tab_exposure:
     st.download_button(
         "Download exposure data (CSV)", csv_bytes,
         file_name="lagos_exposure_by_lga.csv", mime="text/csv",
-        icon=":material/download:",
+        icon=":material/download:", on_click="ignore",
     )
 
 
@@ -1156,7 +1180,8 @@ with tab_scenario:
 
         # Lagos is a ~5:1 strip, so the map gets the full width to be legible.
         label("Recomputed hazard zones")
-        st.image(scenario_zones_image(zones, ref), width="stretch")
+        inline_image(scenario_zones_image(zones, ref),
+                     f"Recomputed hazard zones for rainfall ×{scale:.2f}")
         zone_chips()
 
         chart_c, table_c = st.columns(2, gap="large")
@@ -1190,7 +1215,7 @@ with tab_scenario:
                 "Scenario exposure (CSV)",
                 _exposure_csv(exp),
                 file_name=f"scenario_exposure_x{scale:.2f}.csv",
-                mime="text/csv", icon=":material/download:", width="stretch",
+                mime="text/csv", icon=":material/download:", on_click="ignore", width="stretch",
             )
 
         with dl2:
@@ -1199,7 +1224,7 @@ with tab_scenario:
                 "Scenario zones (GeoTIFF)",
                 tiff_bytes,
                 file_name=f"scenario_zones_x{scale:.2f}.tif",
-                mime="image/tiff", icon=":material/download:", width="stretch",
+                mime="image/tiff", icon=":material/download:", on_click="ignore", width="stretch",
             )
 
 
@@ -1256,7 +1281,7 @@ with tab_climate:
                         <div class="fx-fig-title">Figure {idx + 1}. {title}</div>
                         <div class="fx-fig-desc">{desc}</div>
                         """, unsafe_allow_html=True)
-                        st.image(fpath, width="stretch")
+                        inline_image(fpath, title)
                     else:
                         st.caption(f"Chart not found: {fname}")
 
@@ -1269,7 +1294,7 @@ with tab_climate:
     st.download_button(
         "Download climatology data (CSV)", csv_clim,
         file_name="nimet_climatology_1996_2025.csv", mime="text/csv",
-        icon=":material/download:",
+        icon=":material/download:", on_click="ignore",
     )
 
 # ─────────────────────── TAB 7 — SWAT+ HYDROLOGY ─────────────────────────────
