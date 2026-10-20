@@ -767,7 +767,7 @@ with st.sidebar:
     <div class="fx-side-title">Flood Risk Analysis and Visualization Web Portal for
         Lagos State, Nigeria</div>
     <dl class="fx-dl">
-        <dt>Student</dt><dd>Attah Gbubemi David (190402060)</dd>
+        <dt>Student</dt><dd>Attah Gbubemi David</dd>
         <dt>Supervisor</dt><dd>Dr O. C. Echeta</dd>
         <dt>Institution</dt><dd>Department of Civil &amp; Environmental Engineering,
             University of Lagos</dd>
